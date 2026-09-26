@@ -1,0 +1,62 @@
+services:
+    app:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: laravel-app
+        restart: unless-stopped
+        ports:
+            - "1510:80"
+            - "5173:5173"
+        volumes:
+            - .:/var/www/html
+        env_file:
+            - .env
+        environment:
+            - DB_CONNECTION=${DB_CONNECTION}
+            - DB_HOST=${DB_HOST}
+            - DB_PORT=${DB_PORT}
+            - DB_DATABASE=${DB_DATABASE}
+            - DB_USERNAME=${DB_USERNAME}
+            - DB_PASSWORD=${DB_PASSWORD}
+        depends_on:
+            - db
+        networks:
+            - laravel-net
+
+    db:
+        image: mariadb:latest
+        container_name: mariadb-db
+        restart: unless-stopped
+        environment:
+            MYSQL_DATABASE: ${DB_DATABASE}
+            MYSQL_USER: ${DB_USERNAME}
+            MYSQL_PASSWORD: ${DB_PASSWORD}
+            MYSQL_ROOT_PASSWORD: root_password_here
+        ports:
+            - "3306:3306"
+        volumes:
+            - db-data:/var/lib/mysql
+        networks:
+            - laravel-net
+
+    phpmyadmin:
+        image: phpmyadmin:latest
+        container_name: phpmyadmin
+        restart: unless-stopped
+        ports:
+            - "8001:80"
+        environment:
+            - PMA_HOST=db
+            - MYSQL_ROOT_PASSWORD=root_password_here
+        networks:
+            - laravel-net
+        depends_on:
+            - db
+
+networks:
+    laravel-net:
+        driver: bridge
+
+volumes:
+    db-data:
