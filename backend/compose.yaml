@@ -7,7 +7,6 @@ services:
         restart: unless-stopped
         ports:
             - "1510:80"
-            - "5173:5173"
         volumes:
             - .:/var/www/html
         env_file:
@@ -21,6 +20,19 @@ services:
             - DB_PASSWORD=${DB_PASSWORD}
         depends_on:
             - db
+        networks:
+            - laravel-net
+
+    node:
+        image: node:20-alpine
+        container_name: laravel-node
+        restart: unless-stopped
+        working_dir: /var/www/html
+        ports:
+            - "5173:5173"
+        volumes:
+            - .:/var/www/html
+        command: npm run dev -- --host 0.0.0.0
         networks:
             - laravel-net
 

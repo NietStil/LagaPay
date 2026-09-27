@@ -1,0 +1,162 @@
+CREATE OR REPLACE TABLE `Gebruikers` (
+	`id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+	`voornaam` VARCHAR(255) NOT NULL,
+	`achternaam` VARCHAR(255) NOT NULL,
+	`tussenvoegsels` VARCHAR(255),
+	`email` VARCHAR(255) NOT NULL,
+	`wachtwoord` VARCHAR(255),
+	`google_id` VARCHAR(255),
+	PRIMARY KEY(`id`)
+);
+
+CREATE OR REPLACE TABLE `Evenementen` (
+	`id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+	`naam` VARCHAR(255) NOT NULL,
+	`open` BOOLEAN NOT NULL,
+	`start_datum` DATETIME NOT NULL,
+	`eind_datum` DATETIME NOT NULL,
+	`telefoon_betaling` BOOLEAN NOT NULL,
+	`munten_terugstorten` BOOLEAN NOT NULL,
+	`code` VARCHAR(255) NOT NULL UNIQUE,
+	PRIMARY KEY(`id`)
+);
+
+CREATE OR REPLACE TABLE `Tickets` (
+	`id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+	`event_id` BIGINT UNSIGNED NOT NULL,
+	`prijs` DECIMAL(10,2) NOT NULL,
+	`naam` VARCHAR(255) NOT NULL,
+	`munten` INTEGER,
+	PRIMARY KEY(`id`)
+);
+
+CREATE OR REPLACE TABLE `Producten` (
+	`id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+	`event_id` BIGINT UNSIGNED NOT NULL,
+	`prijs` INTEGER NOT NULL COMMENT 'De prijs in munten',
+	`naam` VARCHAR(255) NOT NULL,
+	PRIMARY KEY(`id`)
+);
+
+CREATE OR REPLACE TABLE `Opwaarderingen` (
+	`id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+	`mollie_id` VARCHAR(255) NOT NULL UNIQUE,
+	`status` VARCHAR(255) NOT NULL,
+	`amount` DECIMAL(10,2) NOT NULL,
+	`method` VARCHAR(255) NOT NULL,
+	`gebruiker_id` BIGINT UNSIGNED NOT NULL,
+	`event_id` BIGINT UNSIGNED NOT NULL,
+	PRIMARY KEY(`id`)
+);
+
+CREATE OR REPLACE TABLE `Munten` (
+	`id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+	`gebruiker_id` BIGINT UNSIGNED,
+	`event_id` BIGINT UNSIGNED NOT NULL,
+	`groep_id` BIGINT UNSIGNED,
+	`hoeveelheid` INTEGER NOT NULL,
+	`laatste_transactie` BIGINT UNSIGNED,
+	PRIMARY KEY(`id`)
+);
+
+CREATE OR REPLACE TABLE `Transacties` (
+	`id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+	`gebruiker_id` BIGINT UNSIGNED NOT NULL,
+	`event_id` BIGINT UNSIGNED NOT NULL,
+	`groep_id` BIGINT UNSIGNED,
+	`hoeveelheid` INTEGER NOT NULL,
+	`type` VARCHAR(255) NOT NULL,
+	PRIMARY KEY(`id`)
+);
+
+CREATE OR REPLACE TABLE `Kaarten` (
+	`id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+	`uid` VARCHAR(64) NOT NULL,
+	`type` VARCHAR(255) NOT NULL,
+	`actief` BOOLEAN NOT NULL,
+	`event_id` BIGINT UNSIGNED,
+	`gebruiker_id` BIGINT UNSIGNED NOT NULL,
+	PRIMARY KEY(`id`)
+);
+
+CREATE OR REPLACE TABLE `Groepen` (
+	`id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+	`naam` VARCHAR(255) NOT NULL,
+	`event_id` BIGINT UNSIGNED NOT NULL,
+	`code` VARCHAR(255) NOT NULL,
+	PRIMARY KEY(`id`)
+);
+
+CREATE OR REPLACE TABLE `Gebruiker_Groep` (
+	`groep_id` BIGINT UNSIGNED NOT NULL,
+	`gebruiker_id` BIGINT UNSIGNED NOT NULL,
+	PRIMARY KEY(`groep_id`, `gebruiker_id`)
+);
+
+CREATE OR REPLACE TABLE `password_reset_tokens` (
+	`email` VARCHAR(255) NOT NULL,
+	`token` VARCHAR(255) NOT NULL,
+	`created_at` TIMESTAMP NULL,
+	PRIMARY KEY(`email`)
+);
+
+CREATE OR REPLACE TABLE `sessions` (
+	`id` VARCHAR(255) NOT NULL,
+	`user_id` BIGINT UNSIGNED NULL,
+	`ip_address` VARCHAR(45) NULL,
+	`user_agent` TEXT NULL,
+	`payload` LONGTEXT NOT NULL,
+	`last_activity` INT NOT NULL,
+	PRIMARY KEY(`id`),
+	KEY `sessions_user_id_index` (`user_id`),
+	KEY `sessions_last_activity_index` (`last_activity`)
+);
+
+ALTER TABLE `Tickets`
+ADD FOREIGN KEY(`event_id`) REFERENCES `Evenementen`(`id`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Opwaarderingen`
+ADD FOREIGN KEY(`gebruiker_id`) REFERENCES `Gebruikers`(`id`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Opwaarderingen`
+ADD FOREIGN KEY(`event_id`) REFERENCES `Evenementen`(`id`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Gebruiker_Groep`
+ADD FOREIGN KEY(`gebruiker_id`) REFERENCES `Gebruikers`(`id`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Gebruiker_Groep`
+ADD FOREIGN KEY(`groep_id`) REFERENCES `Groepen`(`id`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Groepen`
+ADD FOREIGN KEY(`event_id`) REFERENCES `Evenementen`(`id`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Kaarten`
+ADD FOREIGN KEY(`gebruiker_id`) REFERENCES `Gebruikers`(`id`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Kaarten`
+ADD FOREIGN KEY(`event_id`) REFERENCES `Evenementen`(`id`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Munten`
+ADD FOREIGN KEY(`event_id`) REFERENCES `Evenementen`(`id`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Transacties`
+ADD FOREIGN KEY(`gebruiker_id`) REFERENCES `Gebruikers`(`id`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Transacties`
+ADD FOREIGN KEY(`event_id`) REFERENCES `Evenementen`(`id`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Transacties`
+ADD FOREIGN KEY(`groep_id`) REFERENCES `Groepen`(`id`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Munten`
+ADD FOREIGN KEY(`groep_id`) REFERENCES `Groepen`(`id`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Munten`
+ADD FOREIGN KEY(`laatste_transactie`) REFERENCES `Transacties`(`id`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Munten`
+ADD FOREIGN KEY(`gebruiker_id`) REFERENCES `Gebruikers`(`id`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Producten`
+ADD FOREIGN KEY(`event_id`) REFERENCES `Evenementen`(`id`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;

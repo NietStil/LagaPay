@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Models\Gebruiker;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
-use Illuminate\Support\Str;
 
 class SocialiteController extends Controller
 {
@@ -15,29 +15,38 @@ class SocialiteController extends Controller
         return Socialite::driver('google')->redirect();
     }
 
-    public function handleGoogleCallback()
+    public function handleGoogleCallback(Request $request)
     {
         try {
             $googleUser = Socialite::driver('google')->user();
+            $email = strtolower(trim($googleUser->email));
 
-            $user = User::updateOrCreate([
-                'email' => $googleUser->email,
-            ], [
-                'name' => $googleUser->name,
-                'password' => bcrypt(Str::random(16)), // Social login doesn't need a password
-            ]);
+            // Query existing user by google_id or email
+            $user = Gebruiker::where('google_id', $googleUser->id)
+                ->orWhere('email', $email)
+                ->first();
+
+            if ($user) {
+                if (!$user->google_id) {
+                    $user->update(['google_id' => $googleUser->id]);
+                }
+            } else {
+                $user = Gebruiker::create([
+                    'voornaam'   => $googleUser->user['given_name'] ?? $googleUser->name ?? '',
+                    'achternaam' => $googleUser->user['family_name'] ?? '',
+                    'email'      => $email,
+                    'google_id'  => $googleUser->id,
+                ]);
+            }
 
             Auth::login($user);
+            $request->session()->regenerate();
 
             return redirect('/');
         } catch (\Exception $e) {
-            return redirect('/')->with('error', 'Google authentication failed.');
+            return redirect('/login')->withErrors([
+                'email' => 'Inloggen via Google is mislukt. Probeer het opnieuw.',
+            ]);
         }
-    }
-
-    public function logout()
-    {
-        Auth::logout();
-        return redirect('/');
     }
 }

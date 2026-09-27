@@ -27,4 +27,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson() || $request->getHost() === 'api.' . parse_url(env('APP_URL', 'localhost'), PHP_URL_HOST),
         );
+
+        $exceptions->dontFlash([
+            'wachtwoord',
+        ]);
     })->create();
