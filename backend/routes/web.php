@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Auth\SocialiteController;
+use App\Http\Controllers\Dashboard\DashboardController;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
 
@@ -23,5 +24,7 @@ Route::middleware('guest')->group(function () {
 
 // Routes for authenticated users
 Route::middleware('auth')->group(function () {
+    Route::get('/dashboard/evenementen', [DashboardController::class, 'index'])->name('evenementen');
+
     Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');
 });

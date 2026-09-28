@@ -26,7 +26,7 @@ class AuthController extends Controller
         if (Auth::attempt(['email' => $email, 'password' => $credentials['wachtwoord']], $request->boolean('remember'))) {
             $request->session()->regenerate();
 
-            return redirect()->intended('/');
+            return redirect()->intended('/dashboard/evenementen');
         }
 
         return back()->withErrors([

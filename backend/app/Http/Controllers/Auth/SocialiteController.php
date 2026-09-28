@@ -42,7 +42,7 @@ class SocialiteController extends Controller
             Auth::login($user);
             $request->session()->regenerate();
 
-            return redirect('/');
+            return redirect('/dashboard/evenementen');
         } catch (\Exception $e) {
             return redirect('/login')->withErrors([
                 'email' => 'Inloggen via Google is mislukt. Probeer het opnieuw.',
