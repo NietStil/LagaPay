@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Kaart extends Model
 {
@@ -37,5 +38,10 @@ class Kaart extends Model
     public function gebruiker(): BelongsTo
     {
         return $this->belongsTo(Gebruiker::class, 'gebruiker_id');
+    }
+
+    public function koppelingen(): HasMany
+    {
+        return $this->hasMany(KaartKoppeling::class, 'kaart_id');
     }
 }

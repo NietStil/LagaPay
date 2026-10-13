@@ -56,12 +56,19 @@ export default function Deelnemers({ evenement, deelnemers, transacties }: Selec
     };
 
     const handleKickUser = (gebruikerId: number) => {
-        if (confirm('Weet je zeker dat je deze deelnemer wilt verwijderen uit het evenement?')) {
+        if (confirm('Weet je zeker dat je deze deelnemer wilt blokkeren voor dit evenement?')) {
             router.delete(`/dashboard/evenementen/${evenement.id}/deelnemers/${gebruikerId}`, {
                 preserveScroll: true,
                 onSuccess: () => setActiveMenuId(null),
             });
         }
+    };
+
+    const handleUnblock = (gebruikerId: number) => {
+        router.post(`/dashboard/evenementen/${evenement.id}/deelnemers/${gebruikerId}/deblokkeren`, {}, {
+            preserveScroll: true,
+            onSuccess: () => setActiveMenuId(null),
+        });
     };
 
     const handleDisableKaarten = (gebruikerId: number) => {
@@ -185,6 +192,11 @@ export default function Deelnemers({ evenement, deelnemers, transacties }: Selec
                                                             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                                                         </svg>
                                                         <span>{fullName}</span>
+                                                        {gebruiker.geblokkeerd ? (
+                                                            <span className="px-2 py-0.5 rounded bg-red-950 text-red-300 border border-red-800/50 text-[10px] font-semibold">
+                                                                Geblokkeerd
+                                                            </span>
+                                                        ) : null}
                                                     </td>
                                                     <td className="px-6 py-4 text-zinc-400 text-xs">
                                                         {gebruiker.email}
@@ -234,6 +246,14 @@ export default function Deelnemers({ evenement, deelnemers, transacties }: Selec
                                                                     isNearBottom ? 'bottom-12' : 'top-12'
                                                                 }`}
                                                             >
+                                                                {gebruiker.geblokkeerd ? (
+                                                                <button
+                                                                    onClick={() => handleUnblock(gebruiker.id)}
+                                                                    className="w-full px-4 py-2.5 text-xs font-semibold text-emerald-400 hover:bg-zinc-800/80 flex items-center gap-2 transition-colors"
+                                                                >
+                                                                    <span>Deblokkeer deelnemer</span>
+                                                                </button>
+                                                                ) : (
                                                                 <button
                                                                     onClick={() => handleKickUser(gebruiker.id)}
                                                                     className="w-full px-4 py-2.5 text-xs font-semibold text-red-400 hover:bg-zinc-800/80 flex items-center gap-2 transition-colors"
@@ -241,8 +261,9 @@ export default function Deelnemers({ evenement, deelnemers, transacties }: Selec
                                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6h12a6 6 0 00-6-6zM21 12h-6" />
                                                                     </svg>
-                                                                    <span>Verwijder uit evenement</span>
+                                                                    <span>Blokkeer uit evenement</span>
                                                                 </button>
+                                                                )}
 
                                                                 <button
                                                                     onClick={() => handleDisableKaarten(gebruiker.id)}
@@ -295,7 +316,7 @@ export default function Deelnemers({ evenement, deelnemers, transacties }: Selec
                                                                                 <span className="text-xs font-medium text-white">{gebruiker.email}</span>
                                                                             </div>
                                                                             <div className="py-2 flex items-center justify-between gap-2">
-                                                                                <span className="text-xs font-semibold text-zinc-400">Ticket Type</span>
+                                                                                <span className="text-xs font-semibold text-zinc-400">Ticket</span>
                                                                                 <span className="text-xs font-medium text-purple-300">{gebruiker.ticket_naam || '-'}</span>
                                                                             </div>
                                                                             <div className="py-2 flex items-center justify-between gap-2">

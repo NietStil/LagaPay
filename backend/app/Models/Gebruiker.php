@@ -66,6 +66,13 @@ class Gebruiker extends Authenticatable
         return $this->hasMany(Munt::class, 'gebruiker_id');
     }
 
+    public function evenementen(): BelongsToMany
+    {
+        return $this->belongsToMany(Evenement::class, 'gebruiker_evenement', 'gebruiker_id', 'evenement_id')
+            ->withPivot('geblokkeerd')
+            ->withTimestamps();
+    }
+
     public function tickets()
     {
         return $this->belongsToMany(Ticket::class, 'gebruiker_ticket', 'gebruiker_id', 'ticket_id');

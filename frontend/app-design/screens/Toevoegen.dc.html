@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Evenement toevoegen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{text-decoration:none}
+</style>
+</helmet>
+<div style="position:relative;width:390px;height:844px;overflow:hidden;box-sizing:border-box;background:#09090b;color:#fafafa;font-family:-apple-system,system-ui,'Segoe UI',sans-serif">
+
+<div style="padding:64px 20px 0;display:flex;flex-direction:column;gap:24px">
+
+<div style="display:flex;align-items:center;gap:12px">
+<a href="Main.dc.html" aria-label="Terug" style="width:44px;height:44px;border-radius:14px;background:#18181b;border:1px solid #27272a;display:flex;align-items:center;justify-content:center;color:#a1a1aa">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 19l-7-7 7-7"/></svg>
+</a>
+</div>
+
+<div>
+<h1 style="margin:0;font-size:28px;font-weight:700;letter-spacing:-0.5px">Evenement toevoegen</h1>
+<p style="margin:8px 0 0;font-size:15px;line-height:1.5;color:#a1a1aa">Scan de QR-code van het evenement om deel te nemen.</p>
+</div>
+
+<div style="position:relative;height:420px;border-radius:28px;background:#131316;border:1px solid #27272a;display:flex;align-items:center;justify-content:center">
+<div style="position:relative;width:240px;height:240px">
+<div style="position:absolute;left:0;top:0;width:44px;height:44px;border-left:5px solid #d8b4fe;border-top:5px solid #d8b4fe;border-radius:16px 0 0 0"></div>
+<div style="position:absolute;right:0;top:0;width:44px;height:44px;border-right:5px solid #d8b4fe;border-top:5px solid #d8b4fe;border-radius:0 16px 0 0"></div>
+<div style="position:absolute;left:0;bottom:0;width:44px;height:44px;border-left:5px solid #d8b4fe;border-bottom:5px solid #d8b4fe;border-radius:0 0 0 16px"></div>
+<div style="position:absolute;right:0;bottom:0;width:44px;height:44px;border-right:5px solid #d8b4fe;border-bottom:5px solid #d8b4fe;border-radius:0 0 16px 0"></div>
+<div style="position:absolute;left:24px;right:24px;top:50%;height:2px;background:#7e22ce;border-radius:2px"></div>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:20px;text-align:center;font-size:13px;color:#a1a1aa">Houd de QR-code binnen het kader</div>
+</div>
+
+<div style="display:flex;gap:12px;padding:14px 16px;border-radius:16px;background:#18181b;border:1px solid #27272a;font-size:13px;line-height:1.5;color:#d4d4d8">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d8b4fe" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:1px"><path d="M10 13a5 5 0 007.07 0l3-3a5 5 0 00-7.07-7.07l-1.5 1.5M14 11a5 5 0 00-7.07 0l-3 3a5 5 0 007.07 7.07l1.5-1.5"/></svg>
+<span>Heb je een link gekregen? Open die op je telefoon, dan word je automatisch toegevoegd.</span>
+</div>
+
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -67,12 +67,14 @@ export default function EvenementenLayout({ evenement, groepen, deelnemers, groe
                 transacties={deelnemer_transacties}
             />,
         },
-        {
-            id: 'tickets',
-            label: 'Tickets',
-            component: <Tickets evenement={evenement}
-            />,
-        },
+        ...(evenement.heeft_tickets
+            ? [{
+                id: 'tickets',
+                label: 'Tickets',
+                component: <Tickets evenement={evenement}
+                />,
+            }]
+            : []),
         {
             id: 'producten',
             label: 'Producten',

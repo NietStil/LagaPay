@@ -25,6 +25,7 @@ export interface Evenement {
     eind_datum: string | Date | null;
     telefoon_betaling: boolean;
     munten_terugstorten: boolean;
+    heeft_tickets: boolean;
     munt_prijs: number;
     code: string | null;
     groepen_count?: number;

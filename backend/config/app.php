@@ -65,7 +65,9 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    // Dutch local time: the dashboard's date fields (datetime-local) are entered in it and stored as-is,
+    // and the API sends dates with this offset (e.g. +02:00) so the app shows them correctly.
+    'timezone' => 'Europe/Amsterdam',
 
     /*
     |--------------------------------------------------------------------------

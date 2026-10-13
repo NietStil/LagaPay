@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import DashboardLayout from '../../Layouts/DashboardLayout';
-import { router } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 
 export interface Evenement {
     id: number;
@@ -10,6 +10,7 @@ export interface Evenement {
     eind_datum: string | null;
     telefoon_betaling: boolean;
     munten_terugstorten: boolean;
+    heeft_tickets: boolean;
     code: string | null;
     groepen_count?: number;
     transacties_count?: number;
@@ -33,6 +34,33 @@ export default function Evenementen({ evenementen = [] }: Props) {
         if (filterStatus === 'closed') return matchesSearch && !event.open;
         return matchesSearch;
     });
+
+    const [showModal, setShowModal] = useState(false);
+    const form = useForm({
+        naam: '',
+        start_datum: '',
+        eind_datum: '',
+        telefoon_betaling: false,
+        munten_terugstorten: false,
+        heeft_tickets: false,
+        munt_prijs: '',
+    });
+
+    const closeModal = () => {
+        setShowModal(false);
+        form.reset();
+        form.clearErrors();
+    };
+
+    const submit = (e: React.FormEvent) => {
+        e.preventDefault();
+        form.post('/dashboard/evenementen', {
+            onSuccess: () => closeModal(),
+        });
+    };
+
+    const inputClass =
+        'w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-purple-500 transition-colors';
 
     const openCount = evenementen.filter((e) => e.open).length;
     const closedCount = evenementen.length - openCount;
@@ -125,7 +153,7 @@ export default function Evenementen({ evenementen = [] }: Props) {
                             Evenementen
                         </h2>
                         <button
-                            onClick={() => alert('Nieuw evenement aanmaken')}
+                            onClick={() => setShowModal(true)}
                             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-semibold text-sm transition-all shadow-md shadow-purple-950/40"
                         >
                             <span>Nieuw</span>
@@ -151,7 +179,7 @@ export default function Evenementen({ evenementen = [] }: Props) {
                                     : 'Er zijn momenteel nog geen evenementen aangemaakt.'}
                             </p>
                             <button
-                                onClick={() => alert('Nieuw evenement aanmaken')}
+                                onClick={() => setShowModal(true)}
                                 className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-semibold text-xs transition-all"
                             >
                                 Eerste Evenement Aanmaken
@@ -210,6 +238,120 @@ export default function Evenementen({ evenementen = [] }: Props) {
                     )}
                 </main>
             </div>
+            {showModal && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+                    onClick={closeModal}
+                >
+                    <form
+                        onSubmit={submit}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4"
+                    >
+                        <h3 className="text-lg font-bold text-white">Nieuw evenement</h3>
+
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">Naam</label>
+                            <input
+                                type="text"
+                                value={form.data.naam}
+                                onChange={(e) => form.setData('naam', e.target.value)}
+                                className={inputClass}
+                                required
+                            />
+                            {form.errors.naam && <p className="text-xs text-red-400">{form.errors.naam}</p>}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">Start datum</label>
+                                <input
+                                    type="datetime-local"
+                                    value={form.data.start_datum}
+                                    onChange={(e) => form.setData('start_datum', e.target.value)}
+                                    className={inputClass}
+                                    required
+                                />
+                                {form.errors.start_datum && <p className="text-xs text-red-400">{form.errors.start_datum}</p>}
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">Eind datum</label>
+                                <input
+                                    type="datetime-local"
+                                    value={form.data.eind_datum}
+                                    onChange={(e) => form.setData('eind_datum', e.target.value)}
+                                    className={inputClass}
+                                    required
+                                />
+                                {form.errors.eind_datum && <p className="text-xs text-red-400">{form.errors.eind_datum}</p>}
+                            </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">Munt prijs (€)</label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={form.data.munt_prijs}
+                                onChange={(e) => form.setData('munt_prijs', e.target.value)}
+                                className={inputClass}
+                                required
+                            />
+                            {form.errors.munt_prijs && <p className="text-xs text-red-400">{form.errors.munt_prijs}</p>}
+                        </div>
+
+                        <label className="flex items-center gap-2 text-sm text-zinc-200">
+                            <input
+                                type="checkbox"
+                                checked={form.data.telefoon_betaling}
+                                onChange={(e) => form.setData('telefoon_betaling', e.target.checked)}
+                                className="accent-purple-600"
+                            />
+                            Telefoon betaling
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-zinc-200">
+                            <input
+                                type="checkbox"
+                                checked={form.data.munten_terugstorten}
+                                onChange={(e) => form.setData('munten_terugstorten', e.target.checked)}
+                                className="accent-purple-600"
+                            />
+                            Munten terugstorten
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-zinc-200">
+                            <input
+                                type="checkbox"
+                                checked={form.data.heeft_tickets}
+                                onChange={(e) => form.setData('heeft_tickets', e.target.checked)}
+                                className="accent-purple-600"
+                            />
+                            Tickets
+                        </label>
+
+                        {(form.errors as Record<string, string>).error && (
+                            <p className="text-xs text-red-400">{(form.errors as Record<string, string>).error}</p>
+                        )}
+
+                        <div className="flex justify-end gap-2 pt-2">
+                            <button
+                                type="button"
+                                onClick={closeModal}
+                                className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-semibold transition-all"
+                            >
+                                Annuleren
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={form.processing}
+                                className="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 disabled:opacity-60 text-white text-sm font-semibold transition-all"
+                            >
+                                Aanmaken
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
         </DashboardLayout>
     );
 }

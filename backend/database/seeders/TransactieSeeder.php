@@ -18,7 +18,7 @@ class TransactieSeeder extends Seeder
         Gebruiker::all()->each(function ($gebruiker) {
 
             // Haal de evenementen op waarvoor deze gebruiker een ticket heeft
-            $evenementenIds = $gebruiker->tickets()->pluck('evenement_id')->unique();
+            $evenementenIds = $gebruiker->evenementen()->pluck('evenementen.id');
 
             if ($evenementenIds->isEmpty()) {
                 return;
@@ -85,12 +85,12 @@ class TransactieSeeder extends Seeder
         });
 
         // 2. Maak 200 individuele transacties zonder groep (groep_id is null) voor evenementen van deelnemers
-        $gebruikersMetTickets = Gebruiker::whereHas('tickets')->get();
+        $gebruikersMetTickets = Gebruiker::whereHas('evenementen')->get();
 
         if ($gebruikersMetTickets->isNotEmpty()) {
             for ($i = 0; $i < 200; $i++) {
                 $gebruiker = $gebruikersMetTickets->random();
-                $evenementenIds = $gebruiker->tickets()->pluck('evenement_id')->unique();
+                $evenementenIds = $gebruiker->evenementen()->pluck('evenementen.id');
 
                 if ($evenementenIds->isEmpty()) {
                     continue;

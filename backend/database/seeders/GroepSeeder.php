@@ -17,8 +17,8 @@ class GroepSeeder extends Seeder
                 'evenement_id' => $evenement->id,
             ]);
 
-            $eventGebruikers = Gebruiker::whereHas('tickets', function ($query) use ($evenement) {
-                $query->where('evenement_id', $evenement->id);
+            $eventGebruikers = Gebruiker::whereHas('evenementen', function ($query) use ($evenement) {
+                $query->where('evenementen.id', $evenement->id);
             })->get();
 
             if ($eventGebruikers->isEmpty()) {

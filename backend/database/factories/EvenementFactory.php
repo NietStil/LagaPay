@@ -19,8 +19,9 @@ class EvenementFactory extends Factory
             'eind_datum' => fake()->dateTimeBetween('+1 week', '+2 weeks'),
             'telefoon_betaling' => fake()->boolean(),
             'munten_terugstorten' => fake()->boolean(),
+            'heeft_tickets' => true,
             'munt_prijs' => fake()->randomFloat(2, 1.50, 3.50),
-            'code' => fake()->unique()->regexify('[A-Za-z0-9_-]{10}'),
+            'code' => fake()->unique()->regexify('[A-Za-z0-9_-]{15}'),
             'gebruiker' => Gebruiker::factory(),
         ];
     }

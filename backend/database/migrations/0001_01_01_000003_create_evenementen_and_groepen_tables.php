@@ -20,6 +20,7 @@ return new class extends Migration
             $table->dateTime('eind_datum');
             $table->boolean('telefoon_betaling');
             $table->boolean('munten_terugstorten');
+            $table->boolean('heeft_tickets');
             $table->decimal('munt_prijs', 10, 2);
             $table->string('code')->unique();
             $table->timestamps();

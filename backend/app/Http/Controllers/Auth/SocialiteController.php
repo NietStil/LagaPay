@@ -11,13 +11,52 @@ use Laravel\Socialite\Facades\Socialite;
 
 class SocialiteController extends Controller
 {
-    public function redirectToGoogle()
+    public function redirectToGoogle(Request $request)
     {
+        // The mobile app opens this web flow with ?app_redirect=<deep link>.
+        // Remember it in the session so the callback can hand back an API token.
+        $appRedirect = $request->query('app_redirect');
+
+        if (is_string($appRedirect) && $this->isAllowedAppRedirect($appRedirect)) {
+            $request->session()->put('google_app_redirect', $appRedirect);
+        } else {
+            $request->session()->forget('google_app_redirect');
+        }
+
         return Socialite::driver('google')->redirect();
+    }
+
+    /**
+     * Only allow redirects back into the app (custom scheme, Expo Go) or to
+     * localhost for web development, so tokens can't be sent to arbitrary hosts.
+     */
+    private function isAllowedAppRedirect(string $url): bool
+    {
+        $parts = parse_url($url);
+
+        if (!$parts || empty($parts['scheme'])) {
+            return false;
+        }
+
+        $scheme = strtolower($parts['scheme']);
+
+        if (in_array($scheme, ['lagapay', 'exp', 'exps'], true)) {
+            return true;
+        }
+
+        return in_array($scheme, ['http', 'https'], true)
+            && in_array($parts['host'] ?? '', ['localhost', '127.0.0.1'], true);
+    }
+
+    private function appRedirectUrl(string $base, array $query): string
+    {
+        return $base . (str_contains($base, '?') ? '&' : '?') . http_build_query($query);
     }
 
     public function handleGoogleCallback(Request $request)
     {
+        $appRedirect = $request->session()->pull('google_app_redirect');
+
         try {
             $googleUser = Socialite::driver('google')->user();
             $email = strtolower(trim($googleUser->email));
@@ -39,11 +78,24 @@ class SocialiteController extends Controller
                 ]);
             }
 
+            // Request came from the mobile app: return a Sanctum token via deep link.
+            if ($appRedirect) {
+                $token = $user->createToken('expo-mobile-app')->plainTextToken;
+
+                return redirect()->away($this->appRedirectUrl($appRedirect, ['token' => $token]));
+            }
+
             Auth::login($user);
             $request->session()->regenerate();
 
             return redirect('/dashboard/evenementen');
         } catch (\Exception $e) {
+            if ($appRedirect) {
+                return redirect()->away($this->appRedirectUrl($appRedirect, [
+                    'error' => 'Inloggen via Google is mislukt.',
+                ]));
+            }
+
             return redirect('/login')->withErrors([
                 'email' => 'Inloggen via Google is mislukt. Probeer het opnieuw.',
             ]);

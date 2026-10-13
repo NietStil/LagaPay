@@ -18,7 +18,7 @@ class TicketSeeder extends Seeder
         }
 
         // 1. Create all evenementen and their tickets first
-        Evenement::all()->each(function ($evenement) {
+        Evenement::where('heeft_tickets', true)->get()->each(function ($evenement) {
             $numberOfTicketTypes = rand(1, 3);
 
             Ticket::factory()->count($numberOfTicketTypes)->create([
@@ -67,6 +67,7 @@ class TicketSeeder extends Seeder
 
             if ($selectedTickets->isNotEmpty()) {
                 $gebruiker->tickets()->syncWithoutDetaching($selectedTickets->pluck('id'));
+                $gebruiker->evenementen()->syncWithoutDetaching($selectedTickets->pluck('evenement_id')->unique());
             }
         });
 
@@ -78,7 +79,20 @@ class TicketSeeder extends Seeder
 
             if ($adminTickets->isNotEmpty()) {
                 $admin->tickets()->syncWithoutDetaching($adminTickets->pluck('id'));
+                $admin->evenementen()->syncWithoutDetaching($adminTickets->pluck('evenement_id')->unique());
             }
         }
+
+        // 4. Create a free evenement (no tickets) whose deelnemers are linked directly
+        $gratis = Evenement::factory()->create([
+            'naam'      => 'Gratis evenement',
+            'open'      => true,
+            'heeft_tickets' => false,
+            'gebruiker' => $admin?->id ?? $gebruikers->first()->id,
+        ]);
+
+        $gratis->deelnemers()->syncWithoutDetaching(
+            $gebruikers->random(min(20, $gebruikers->count()))->pluck('id')
+        );
     }
 }

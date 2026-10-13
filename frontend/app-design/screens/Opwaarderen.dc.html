@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Opwaarderen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{text-decoration:none}
+</style>
+</helmet>
+<div style="position:relative;width:390px;height:844px;overflow:hidden;box-sizing:border-box;background:#09090b;color:#fafafa;font-family:-apple-system,system-ui,'Segoe UI',sans-serif">
+
+<div style="padding:64px 20px 0;display:flex;flex-direction:column;gap:28px">
+
+<div style="display:flex;align-items:center;gap:12px">
+<a href="Overzicht.dc.html" aria-label="Terug" style="width:44px;height:44px;border-radius:14px;background:#18181b;border:1px solid #27272a;display:flex;align-items:center;justify-content:center;color:#a1a1aa;flex-shrink:0">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 19l-7-7 7-7"/></svg>
+</a>
+<div>
+<h1 style="margin:0;font-size:22px;font-weight:700;letter-spacing:-0.3px">Opwaarderen</h1>
+<div style="margin-top:2px;font-size:13px;color:#a1a1aa">Laga Zomerfeest</div>
+</div>
+</div>
+
+<div style="text-align:center;padding-top:12px">
+<div style="font-size:96px;font-weight:800;letter-spacing:-3px;line-height:1">20</div>
+<div style="margin-top:8px;font-size:18px;font-weight:600;color:#d8b4fe">munten</div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">
+<button style="padding:14px 0 12px;border-radius:16px;border:1px solid #27272a;background:#18181b;color:#fafafa;display:flex;flex-direction:column;align-items:center;gap:4px">
+<span style="font-size:20px;font-weight:700">5</span>
+<span style="font-size:11px;color:#a1a1aa">€ 7,50</span>
+</button>
+<button style="padding:14px 0 12px;border-radius:16px;border:1px solid #27272a;background:#18181b;color:#fafafa;display:flex;flex-direction:column;align-items:center;gap:4px">
+<span style="font-size:20px;font-weight:700">10</span>
+<span style="font-size:11px;color:#a1a1aa">€ 15,00</span>
+</button>
+<button style="padding:14px 0 12px;border-radius:16px;border:1.5px solid #7e22ce;background:#3b0764;color:#fff;display:flex;flex-direction:column;align-items:center;gap:4px">
+<span style="font-size:20px;font-weight:700">20</span>
+<span style="font-size:11px;color:#e9d5ff">€ 30,00</span>
+</button>
+<button style="padding:14px 0 12px;border-radius:16px;border:1px solid #27272a;background:#18181b;color:#fafafa;display:flex;flex-direction:column;align-items:center;gap:4px">
+<span style="font-size:20px;font-weight:700">50</span>
+<span style="font-size:11px;color:#a1a1aa">€ 75,00</span>
+</button>
+</div>
+
+<div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-top:-8px">
+<button aria-label="Eén munt minder" style="width:44px;height:44px;border-radius:14px;border:1px solid #3f3f46;background:#18181b;color:#fafafa;display:flex;align-items:center;justify-content:center">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg>
+</button>
+<span style="font-size:13px;color:#a1a1aa">Of stel zelf een aantal in</span>
+<button aria-label="Eén munt meer" style="width:44px;height:44px;border-radius:14px;border:1px solid #3f3f46;background:#18181b;color:#fafafa;display:flex;align-items:center;justify-content:center">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+</button>
+</div>
+
+<div style="display:flex;gap:12px;padding:14px 16px;border-radius:16px;background:#18181b;border:1px solid #27272a;font-size:13px;line-height:1.5;color:#d4d4d8">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d8b4fe" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:1px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+<span>Je kiest de betaalmethode op de beveiligde pagina van Mollie. Daarna kom je automatisch terug in de app.</span>
+</div>
+
+</div>
+
+<div style="position:absolute;left:0;right:0;bottom:0;box-sizing:border-box;padding:16px 20px 32px;background:#09090b;border-top:1px solid #27272a">
+<button style="width:100%;padding:16px;border:0;border-radius:16px;background:#7e22ce;color:#fff;font-size:16px;font-weight:600">Verder naar betalen · € 30,00</button>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

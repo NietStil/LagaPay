@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { router, Link } from '@inertiajs/react';
 import type { Evenement } from '../../../types/type';
+import DeelnameLink from '../../../Components/Evenementen/DeelnameLink';
 
 interface SelectedEvenementProps {
     evenement: Evenement;
@@ -185,13 +186,6 @@ export default function Evenement({ evenement, producten_verkoop }: SelectedEven
                         </div>
 
                         <div className="flex justify-between items-center py-1 border-t border-zinc-800/60">
-                            <span className="text-zinc-400 font-medium">Toegangscode</span>
-                            <span className="font-mono text-purple-300 bg-zinc-950 px-2.5 py-1 rounded border border-zinc-800">
-                                {evenement.code || 'Geen code'}
-                            </span>
-                        </div>
-
-                        <div className="flex justify-between items-center py-1 border-t border-zinc-800/60">
                             <span className="text-zinc-400 font-medium">Startdatum</span>
                             <span className="text-white font-medium">
                                 {evenement.start_datum
@@ -225,6 +219,10 @@ export default function Evenement({ evenement, producten_verkoop }: SelectedEven
                     </div>
                 </div>
 
+                <DeelnameLink evenement={evenement} />
+
+                {evenement.heeft_tickets ? (
+                <>
                 {/* 2. Tickets Section (With Total Sold and Per-Ticket Breakdown) */}
                 <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-lg space-y-4">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-3 border-b border-zinc-800/80">
@@ -280,6 +278,32 @@ export default function Evenement({ evenement, producten_verkoop }: SelectedEven
                         </div>
                     )}
                 </div>
+                </>
+                ) : (
+                <>
+                {/* 2. Deelnemers Section (evenement without tickets) */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-lg flex items-center justify-between">
+                    <div className="space-y-1">
+                        <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                            <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            Deelnemers
+                        </h2>
+                        <p className="text-xs text-zinc-400">
+                            Aantal deelnemers: <strong className="text-emerald-400 font-extrabold text-sm ml-1">{evenement.deelnemers_count ?? 0}</strong>
+                        </p>
+                    </div>
+
+                    <Link
+                        href={`/dashboard/evenementen/${evenement.id}?tab=deelnemers`}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-semibold text-xs sm:text-sm transition-all shadow-md shadow-purple-950/40"
+                    >
+                        <span>Bekijk Deelnemers</span>
+                    </Link>
+                </div>
+                </>
+                )}
 
                 {/* 3. Producten Section */}
                 <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-lg flex items-center justify-between">
@@ -525,6 +549,26 @@ export default function Evenement({ evenement, producten_verkoop }: SelectedEven
                             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                         </svg>
                     </Link>
+                </div>
+
+                {/* Verwijder Section */}
+                <div className="bg-zinc-900 border border-red-900/50 rounded-2xl p-6 shadow-lg flex items-center justify-between gap-4">
+                    <div className="space-y-1">
+                        <h2 className="text-lg font-bold text-red-300">Evenement verwijderen</h2>
+                        <p className="text-xs text-zinc-400">
+                            Verwijdert het evenement met alle tickets, groepen, producten en transacties. Dit kan niet ongedaan worden gemaakt.
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => {
+                            if (confirm(`Weet je zeker dat je "${evenement.naam}" wilt verwijderen? Alle tickets, groepen, producten en transacties van dit evenement worden ook verwijderd. Dit kan niet ongedaan worden gemaakt.`)) {
+                                router.delete(`/dashboard/evenementen/${evenement.id}`);
+                            }
+                        }}
+                        className="px-4 py-2 rounded-xl shrink-0 bg-red-950/80 hover:bg-red-900 text-red-300 border border-red-800/60 text-sm font-semibold transition-colors"
+                    >
+                        Verwijderen
+                    </button>
                 </div>
             </div>
         </div>

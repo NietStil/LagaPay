@@ -2,6 +2,7 @@
 
 namespace App\Services\Evenementen;
 
+use App\Models\Evenement;
 use App\Models\Gebruiker;
 use App\Models\Groep;
 use App\Models\Kaart;
@@ -19,7 +20,14 @@ class DeelnemersService {
                 'gebruikers.achternaam',
                 'gebruikers.email'
             )
-            ->selectRaw('tickets.naam as ticket_naam')
+            ->addSelect('gebruiker_evenement.geblokkeerd')
+            ->selectSub(
+                Ticket::selectRaw("GROUP_CONCAT(tickets.naam SEPARATOR ', ')")
+                    ->join('gebruiker_ticket', 'gebruiker_ticket.ticket_id', '=', 'tickets.id')
+                    ->whereColumn('gebruiker_ticket.gebruiker_id', 'gebruikers.id')
+                    ->where('tickets.evenement_id', $id),
+                'ticket_naam'
+            )
             ->selectSub(
                 Groep::selectRaw("GROUP_CONCAT(groepen.naam SEPARATOR ', ')")
                     ->join('gebruiker_groep', 'gebruiker_groep.groep_id', '=', 'groepen.id')
@@ -40,9 +48,8 @@ class DeelnemersService {
                     ->where('munten.evenement_id', $id),
                 'saldo'
             )
-            ->join('gebruiker_ticket', 'gebruiker_ticket.gebruiker_id', '=', 'gebruikers.id')
-            ->join('tickets', 'tickets.id', '=', 'gebruiker_ticket.ticket_id')
-            ->where('tickets.evenement_id', $id);
+            ->join('gebruiker_evenement', 'gebruiker_evenement.gebruiker_id', '=', 'gebruikers.id')
+            ->where('gebruiker_evenement.evenement_id', $id);
 
         if ($request && $request->filled('search')) {
             $search = '%' . $request->query('search') . '%';
@@ -56,12 +63,36 @@ class DeelnemersService {
         return $query->paginate(100)->withQueryString();
     }
 
-    public function deelnemerVerwijderen($evenementId, $gebruikerId) {
-        $ticketIds = Ticket::where('evenement_id', $evenementId)->pluck('id');
-        DB::table('gebruiker_ticket')
+    public function deelnemerToevoegen($evenementId, $gebruikerId) {
+        $blokkade = DB::table('gebruiker_evenement')
             ->where('gebruiker_id', $gebruikerId)
-            ->whereIn('ticket_id', $ticketIds)
-            ->delete();
+            ->where('evenement_id', $evenementId)
+            ->value('geblokkeerd');
+
+        if ($blokkade) {
+            throw new \DomainException('Je bent geblokkeerd voor dit evenement.');
+        }
+
+        Evenement::findOrFail($evenementId)->deelnemers()->syncWithoutDetaching([$gebruikerId]);
+    }
+
+    public function deelnemerVerwijderen($evenementId, $gebruikerId) {
+        DB::transaction(function () use ($evenementId, $gebruikerId) {
+            DB::table('gebruiker_evenement')->updateOrInsert(
+                ['gebruiker_id' => $gebruikerId, 'evenement_id' => $evenementId],
+                ['geblokkeerd' => true, 'updated_at' => now()]
+            );
+
+            $this->kaartenDeactiveren($evenementId, $gebruikerId);
+            $this->DeelnemerUitGroep($evenementId, $gebruikerId);
+        });
+    }
+
+    public function deelnemerDeblokkeren($evenementId, $gebruikerId) {
+        DB::table('gebruiker_evenement')
+            ->where('gebruiker_id', $gebruikerId)
+            ->where('evenement_id', $evenementId)
+            ->update(['geblokkeerd' => false, 'updated_at' => now()]);
     }
 
     public function kaartenDeactiveren($evenementId, $gebruikerId) {

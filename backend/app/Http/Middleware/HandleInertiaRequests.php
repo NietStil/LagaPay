@@ -39,6 +39,8 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            // Base of the join links that the app opens ({link_url}/e/{code}), see config/lagapay.php.
+            'link_url' => rtrim((string) config('lagapay.link_url'), '/'),
         ]);
     }
 }

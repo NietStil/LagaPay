@@ -19,6 +19,15 @@ class DeelnemersController extends Controller {
         }
     }
 
+    public function deblokkeren($evenement_id, $gebruiker_id) {
+        try {
+            $this->deelnemersService->deelnemerDeblokkeren($evenement_id, $gebruiker_id);
+            return back()->with('success', 'Deelnemer gedeblokkeerd.');
+        } catch (\Throwable $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+    }
+
     public function kaartenDeactiveren($evenement_id, $gebruiker_id) {
         try {
             $this->deelnemersService->kaartenDeactiveren($evenement_id, $gebruiker_id);

@@ -14,8 +14,8 @@ class DatabaseSeeder extends Seeder
         // Call your seeders here
         $this->call([
             GebruikerEvenementSeeder::class,
-            GroepSeeder::class,
             TicketSeeder::class,
+            GroepSeeder::class,
             ProductSeeder::class,
             KaartSeeder::class,
             TransactieSeeder::class,

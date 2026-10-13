@@ -34,7 +34,9 @@ Route::middleware('auth')->group(function () {
     Route::middleware(HeeftWebToegang::class)->group(function() {
         Route::prefix('dashboard/evenementen')->group(function () {
             Route::get('/', [DashboardController::class, 'index'])->name('evenementen');
+            Route::post('/', [EvenementController::class, 'create'])->name('store');
             Route::get('/{id}', [EvenementController::class, 'show'])->name('show');
+            Route::delete('/{id}', [EvenementController::class, 'destroy'])->name('destroy');
 
             Route::prefix('/{evenement_id}')->group(function () {
                 Route::put('/producten', [ProductenController::class, 'update'])->name('product.update');
@@ -42,6 +44,7 @@ Route::middleware('auth')->group(function () {
                 Route::delete('/producten/{id}', [ProductenController::class, 'delete'])->name('product.destroy');
 
                 Route::delete('/deelnemers/{gebruiker_id}', [DeelnemersController::class, 'delete'])->name('deelnemers.kick');
+                Route::post('/deelnemers/{gebruiker_id}/deblokkeren', [DeelnemersController::class, 'deblokkeren'])->name('deelnemers.unblock');
                 Route::post('/deelnemers/{gebruiker_id}/disable-kaarten', [DeelnemersController::class, 'kaartenDeactiveren'])->name('deelnemers.disable-kaarten');
                 Route::post('/deelnemers/{gebruiker_id}/kick-groepen', [DeelnemersController::class, 'DeelnemerUitGroep'])->name('deelnemers.kick-groepen');
 

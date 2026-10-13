@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Kaart groep</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{text-decoration:none}
+</style>
+</helmet>
+<div style="position:relative;width:390px;height:844px;overflow:hidden;box-sizing:border-box;background:#09090b;color:#fafafa;font-family:-apple-system,system-ui,'Segoe UI',sans-serif">
+
+<div style="padding:64px 20px 0;display:flex;flex-direction:column;gap:22px">
+
+<div style="display:flex;align-items:center;gap:12px">
+<a href="Groep.dc.html" aria-label="Terug" style="width:44px;height:44px;border-radius:14px;background:#18181b;border:1px solid #27272a;display:flex;align-items:center;justify-content:center;color:#a1a1aa;flex-shrink:0">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 19l-7-7 7-7"/></svg>
+</a>
+<div>
+<h1 style="margin:0;font-size:22px;font-weight:700;letter-spacing:-0.3px">Kaart</h1>
+<div style="margin-top:2px;font-size:13px;color:#a1a1aa">Laga Zomerfeest</div>
+</div>
+</div>
+
+<div style="display:flex;padding:4px;background:#18181b;border:1px solid #27272a;border-radius:14px">
+<a href="EvenementKaarten.dc.html" style="flex:1;padding:10px;border-radius:10px;text-align:center;font-size:14px;font-weight:600;color:#a1a1aa">Persoonlijk</a>
+<a href="KaartenGroep.dc.html" style="flex:1;padding:10px;border-radius:10px;background:#7e22ce;text-align:center;font-size:14px;font-weight:600;color:#fff">Groep</a>
+</div>
+
+<p style="margin:0;font-size:14px;line-height:1.5;color:#a1a1aa">Met deze kaart betaal je met het saldo van Team Rood. Je kunt één kaart koppelen.</p>
+
+<div style="background:#131316;border:1.5px dashed #3f3f46;border-radius:20px;padding:24px 18px;display:flex;flex-direction:column;align-items:center;gap:14px">
+<div style="width:52px;height:52px;border-radius:16px;background:#18181b;border:1px solid #27272a;display:flex;align-items:center;justify-content:center;color:#a1a1aa">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+</div>
+<div style="text-align:center">
+<div style="font-size:16px;font-weight:600">Nog geen kaart gekoppeld</div>
+<div style="margin-top:4px;font-size:13px;line-height:1.5;color:#a1a1aa">Scan een kaart of gebruik je permanente kaart.</div>
+</div>
+<a href="KaartKoppelenGroep.dc.html" style="display:block;width:100%;box-sizing:border-box;padding:14px;border-radius:14px;background:#7e22ce;color:#fff;font-size:15px;font-weight:600;text-align:center">Kaart koppelen</a>
+</div>
+
+<div style="display:flex;gap:12px;padding:14px 16px;border-radius:16px;background:#18181b;border:1px solid #27272a;font-size:13px;line-height:1.5;color:#d4d4d8">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d8b4fe" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+<span>Je persoonlijke kaart blijft werken voor je eigen saldo. Beheer die op de tab Persoonlijk.</span>
+</div>
+
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
