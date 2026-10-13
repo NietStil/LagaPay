@@ -6,10 +6,7 @@ use App\Models\Gebruiker;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 
-/**
- * @extends Factory<Gebruiker>
- */
-class UserFactory extends Factory
+class GebruikerFactory extends Factory
 {
     protected $model = Gebruiker::class;
 

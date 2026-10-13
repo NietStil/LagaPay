@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import DashboardLayout from '../../../Layouts/DashboardLayout';
+import DashboardLayout from '../../Layouts/DashboardLayout';
+import { router } from '@inertiajs/react';
 
 export interface Evenement {
     id: number;
@@ -162,6 +163,7 @@ export default function Evenementen({ evenementen = [] }: Props) {
                                 <div
                                     key={event.id}
                                     className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 hover:border-purple-800/60 transition-all flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+                                    onClick={() => {router.get(`/dashboard/evenementen/${event.id}`)}}
                                 >
                                     <div className="space-y-2">
                                         <div className="flex items-center gap-3">

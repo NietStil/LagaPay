@@ -12,24 +12,31 @@ class Groep extends Model
 {
     use HasFactory;
 
-    protected $table = 'Groepen';
+    /**
+     * @var \Illuminate\Support\HigherOrderCollectionProxy|mixed
+     */
+    protected $table = 'groepen';
 
-    public $timestamps = false;
+    public $timestamps = true;
 
     protected $fillable = [
         'naam',
-        'event_id',
+        'evenement_id',
         'code',
+        'created_at',
+        'updated_at',
     ];
 
     public function evenement(): BelongsTo
     {
-        return $this->belongsTo(Evenement::class, 'event_id');
+        return $this->belongsTo(Evenement::class, 'evenement_id');
     }
 
     public function gebruikers(): BelongsToMany
     {
-        return $this->belongsToMany(Gebruiker::class, 'Gebruiker_Groep', 'groep_id', 'gebruiker_id');
+        return $this->belongsToMany(Gebruiker::class, 'gebruiker_groep', 'groep_id', 'gebruiker_id')
+            ->withPivot('created_at')
+            ->withTimestamps();
     }
 
     public function transacties(): HasMany

@@ -10,9 +10,9 @@ class Opwaardering extends Model
 {
     use HasFactory;
 
-    protected $table = 'Opwaarderingen';
+    protected $table = 'opwaarderingen';
 
-    public $timestamps = false;
+    public $timestamps = true;
 
     protected $fillable = [
         'mollie_id',
@@ -20,7 +20,9 @@ class Opwaardering extends Model
         'amount',
         'method',
         'gebruiker_id',
-        'event_id',
+        'evenement_id',
+        'created_at',
+        'updated_at',
     ];
 
     protected function casts(): array
@@ -37,6 +39,6 @@ class Opwaardering extends Model
 
     public function evenement(): BelongsTo
     {
-        return $this->belongsTo(Evenement::class, 'event_id');
+        return $this->belongsTo(Evenement::class, 'evenement_id');
     }
 }

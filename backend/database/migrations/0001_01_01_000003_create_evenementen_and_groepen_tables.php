@@ -11,52 +11,66 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('Evenementen', function (Blueprint $table) {
+        Schema::create('evenementen', function (Blueprint $table) {
             $table->id();
             $table->string('naam');
+            $table->unsignedBigInteger('gebruiker');
             $table->boolean('open');
             $table->dateTime('start_datum');
             $table->dateTime('eind_datum');
             $table->boolean('telefoon_betaling');
             $table->boolean('munten_terugstorten');
+            $table->decimal('munt_prijs', 10, 2);
             $table->string('code')->unique();
+            $table->timestamps();
         });
 
-        Schema::create('Groepen', function (Blueprint $table) {
+        Schema::create('groepen', function (Blueprint $table) {
             $table->id();
             $table->string('naam');
-            $table->foreignId('event_id')->constrained('Evenementen')->onUpdate('no action')->onDelete('no action');
+            $table->foreignId('evenement_id')->constrained('evenementen')->onUpdate('no action')->onDelete('no action');
             $table->string('code');
+            $table->timestamps();
         });
 
-        Schema::create('Gebruiker_Groep', function (Blueprint $table) {
-            $table->foreignId('groep_id')->constrained('Groepen')->onUpdate('no action')->onDelete('no action');
-            $table->foreignId('gebruiker_id')->constrained('Gebruikers')->onUpdate('no action')->onDelete('no action');
+        Schema::create('gebruiker_groep', function (Blueprint $table) {
+            $table->foreignId('groep_id')->constrained('groepen')->onUpdate('no action')->onDelete('no action');
+            $table->foreignId('gebruiker_id')->constrained('gebruikers')->onUpdate('no action')->onDelete('no action');
             $table->primary(['groep_id', 'gebruiker_id']);
+            $table->timestamps();
         });
 
-        Schema::create('Tickets', function (Blueprint $table) {
+        Schema::create('tickets', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('event_id')->constrained('Evenementen')->onUpdate('no action')->onDelete('no action');
+            $table->foreignId('evenement_id')->constrained('evenementen')->onUpdate('no action')->onDelete('no action');
             $table->decimal('prijs', 10, 2);
             $table->string('naam');
             $table->integer('munten')->nullable();
+            $table->timestamps();
         });
 
-        Schema::create('Producten', function (Blueprint $table) {
+        Schema::create('gebruiker_ticket', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('event_id')->constrained('Evenementen')->onUpdate('no action')->onDelete('no action');
+            $table->foreignId('gebruiker_id')->constrained('gebruikers')->cascadeOnDelete();
+            $table->foreignId('ticket_id')->constrained('tickets')->cascadeOnDelete();
+        });
+
+        Schema::create('producten', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('evenement_id')->constrained('evenementen')->onUpdate('no action')->onDelete('no action');
             $table->integer('prijs')->comment('De prijs in munten');
             $table->string('naam');
+            $table->timestamps();
         });
 
-        Schema::create('Kaarten', function (Blueprint $table) {
+        Schema::create('kaarten', function (Blueprint $table) {
             $table->id();
             $table->string('uid', 64);
             $table->string('type');
             $table->boolean('actief');
-            $table->foreignId('event_id')->nullable()->constrained('Evenementen')->onUpdate('no action')->onDelete('no action');
-            $table->foreignId('gebruiker_id')->constrained('Gebruikers')->onUpdate('no action')->onDelete('no action');
+            $table->foreignId('evenement_id')->nullable()->constrained('evenementen')->onUpdate('no action')->onDelete('no action');
+            $table->foreignId('gebruiker_id')->constrained('gebruikers')->onUpdate('no action')->onDelete('no action');
+            $table->timestamps();
         });
     }
 
@@ -65,11 +79,11 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('Kaarten');
-        Schema::dropIfExists('Producten');
-        Schema::dropIfExists('Tickets');
-        Schema::dropIfExists('Gebruiker_Groep');
-        Schema::dropIfExists('Groepen');
-        Schema::dropIfExists('Evenementen');
+        Schema::dropIfExists('kaarten');
+        Schema::dropIfExists('producten');
+        Schema::dropIfExists('tickets');
+        Schema::dropIfExists('gebruiker_groep');
+        Schema::dropIfExists('groepen');
+        Schema::dropIfExists('evenementen');
     }
 };

@@ -145,6 +145,7 @@
       <path value="$PROJECT_DIR$/backend/vendor/guzzlehttp/promises" />
       <path value="$PROJECT_DIR$/backend/vendor/doctrine/inflector" />
       <path value="$PROJECT_DIR$/backend/vendor/doctrine/lexer" />
+      <path value="$PROJECT_DIR$/backend/vendor/laravel/sanctum" />
     </include_path>
   </component>
   <component name="PhpProjectSharedConfiguration" php_language_level="8.3" />

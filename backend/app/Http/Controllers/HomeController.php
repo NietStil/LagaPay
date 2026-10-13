@@ -11,8 +11,8 @@ class HomeController extends Controller
     public function index()
     {
         if (Auth::check()) {
-                return redirect()->route('evenementen');
-            }
+            return redirect()->route('evenementen');
+        }
 
         return Inertia::render('HomePagina');
     }

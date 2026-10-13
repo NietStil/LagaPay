@@ -11,12 +11,12 @@ export default function HomePagina() {
                 </span>
 
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => router.get('/register')}
-                        className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold text-sm transition-all duration-200 border border-zinc-700/60"
-                    >
-                        Registreren
-                    </button>
+                    {/*<button*/}
+                    {/*    onClick={() => router.get('/register')}*/}
+                    {/*    className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold text-sm transition-all duration-200 border border-zinc-700/60"*/}
+                    {/*>*/}
+                    {/*    Registreren*/}
+                    {/*</button>*/}
                     <button
                         onClick={() => router.get('/login')}
                         className="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-semibold text-sm transition-all duration-200"
@@ -50,12 +50,12 @@ export default function HomePagina() {
                         >
                             Nu Inloggen
                         </button>
-                        <button
-                            onClick={() => router.get('/register')}
-                            className="px-8 py-3.5 rounded-xl bg-zinc-900 border border-zinc-700/80 hover:bg-zinc-800 text-zinc-200 hover:text-white font-semibold text-sm transition-all"
-                        >
-                            Account Aanmaken
-                        </button>
+                        {/*<button*/}
+                        {/*    onClick={() => router.get('/register')}*/}
+                        {/*    className="px-8 py-3.5 rounded-xl bg-zinc-900 border border-zinc-700/80 hover:bg-zinc-800 text-zinc-200 hover:text-white font-semibold text-sm transition-all"*/}
+                        {/*>*/}
+                        {/*    Account Aanmaken*/}
+                        {/*</button>*/}
                     </div>
                 </div>
             </main>

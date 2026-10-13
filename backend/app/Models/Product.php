@@ -10,12 +10,12 @@ class Product extends Model
 {
     use HasFactory;
 
-    protected $table = 'Producten';
+    protected $table = 'producten';
 
     public $timestamps = false;
 
     protected $fillable = [
-        'event_id',
+        'evenement_id',
         'prijs',
         'naam',
     ];
@@ -29,6 +29,6 @@ class Product extends Model
 
     public function evenement(): BelongsTo
     {
-        return $this->belongsTo(Evenement::class, 'event_id');
+        return $this->belongsTo(Evenement::class, 'evenement_id');
     }
 }

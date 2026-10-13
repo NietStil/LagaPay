@@ -11,32 +11,35 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('Opwaarderingen', function (Blueprint $table) {
+        Schema::create('opwaarderingen', function (Blueprint $table) {
             $table->id();
             $table->string('mollie_id')->unique();
             $table->string('status');
             $table->decimal('amount', 10, 2);
             $table->string('method');
-            $table->foreignId('gebruiker_id')->constrained('Gebruikers')->onUpdate('no action')->onDelete('no action');
-            $table->foreignId('event_id')->constrained('Evenementen')->onUpdate('no action')->onDelete('no action');
+            $table->foreignId('gebruiker_id')->constrained('gebruikers')->onUpdate('no action')->onDelete('no action');
+            $table->foreignId('evenement_id')->constrained('evenementen')->onUpdate('no action')->onDelete('no action');
+            $table->timestamps();
         });
 
-        Schema::create('Transacties', function (Blueprint $table) {
+        Schema::create('transacties', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('gebruiker_id')->constrained('Gebruikers')->onUpdate('no action')->onDelete('no action');
-            $table->foreignId('event_id')->constrained('Evenementen')->onUpdate('no action')->onDelete('no action');
-            $table->foreignId('groep_id')->nullable()->constrained('Groepen')->onUpdate('no action')->onDelete('no action');
+            $table->foreignId('gebruiker_id')->constrained('gebruikers')->onUpdate('no action')->onDelete('no action');
+            $table->foreignId('evenement_id')->constrained('evenementen')->onUpdate('no action')->onDelete('no action');
+            $table->foreignId('groep_id')->nullable()->constrained('groepen')->onUpdate('no action')->onDelete('no action');
             $table->integer('hoeveelheid');
             $table->string('type');
+            $table->timestamps();
         });
 
-        Schema::create('Munten', function (Blueprint $table) {
+        Schema::create('munten', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('gebruiker_id')->nullable()->constrained('Gebruikers')->onUpdate('no action')->onDelete('no action');
-            $table->foreignId('event_id')->constrained('Evenementen')->onUpdate('no action')->onDelete('no action');
-            $table->foreignId('groep_id')->nullable()->constrained('Groepen')->onUpdate('no action')->onDelete('no action');
+            $table->foreignId('gebruiker_id')->nullable()->constrained('gebruikers')->onUpdate('no action')->onDelete('no action');
+            $table->foreignId('evenement_id')->constrained('evenementen')->onUpdate('no action')->onDelete('no action');
+            $table->foreignId('groep_id')->nullable()->constrained('groepen')->onUpdate('no action')->onDelete('no action');
             $table->integer('hoeveelheid');
-            $table->foreignId('laatste_transactie')->nullable()->constrained('Transacties')->onUpdate('no action')->onDelete('no action');
+            $table->foreignId('laatste_transactie')->nullable()->constrained('transacties')->onUpdate('no action')->onDelete('no action');
+            $table->timestamps();
         });
     }
 
@@ -45,8 +48,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('Munten');
-        Schema::dropIfExists('Transacties');
-        Schema::dropIfExists('Opwaarderingen');
+        Schema::dropIfExists('munten');
+        Schema::dropIfExists('transacties');
+        Schema::dropIfExists('opwaarderingen');
     }
 };

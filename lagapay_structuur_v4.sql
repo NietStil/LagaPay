@@ -3,7 +3,7 @@ CREATE OR REPLACE TABLE `Gebruikers` (
 	`voornaam` VARCHAR(255) NOT NULL,
 	`achternaam` VARCHAR(255) NOT NULL,
 	`tussenvoegsels` VARCHAR(255),
-	`email` VARCHAR(255) NOT NULL,
+	`email` VARCHAR(255) NOT NULL UNIQUE,
 	`wachtwoord` VARCHAR(255),
 	`google_id` VARCHAR(255),
 	PRIMARY KEY(`id`)
@@ -17,6 +17,7 @@ CREATE OR REPLACE TABLE `Evenementen` (
 	`eind_datum` DATETIME NOT NULL,
 	`telefoon_betaling` BOOLEAN NOT NULL,
 	`munten_terugstorten` BOOLEAN NOT NULL,
+	`munt_prijs` DECIMAL(10,2) NOT NULL,
 	`code` VARCHAR(255) NOT NULL UNIQUE,
 	PRIMARY KEY(`id`)
 );

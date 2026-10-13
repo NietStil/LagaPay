@@ -10,12 +10,12 @@ class Ticket extends Model
 {
     use HasFactory;
 
-    protected $table = 'Tickets';
+    protected $table = 'tickets';
 
     public $timestamps = false;
 
     protected $fillable = [
-        'event_id',
+        'evenement_id',
         'prijs',
         'naam',
         'munten',
@@ -31,6 +31,11 @@ class Ticket extends Model
 
     public function evenement(): BelongsTo
     {
-        return $this->belongsTo(Evenement::class, 'event_id');
+        return $this->belongsTo(Evenement::class, 'evenement_id');
+    }
+
+    public function gebruikers()
+    {
+        return $this->belongsToMany(Gebruiker::class, 'gebruiker_ticket', 'ticket_id', 'gebruiker_id');
     }
 }

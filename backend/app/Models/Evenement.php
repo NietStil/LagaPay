@@ -10,7 +10,7 @@ class Evenement extends Model
 {
     use HasFactory;
 
-    protected $table = 'Evenementen';
+    protected $table = 'evenementen';
 
     public $timestamps = false;
 
@@ -21,6 +21,7 @@ class Evenement extends Model
         'eind_datum',
         'telefoon_betaling',
         'munten_terugstorten',
+        'munt_prijs',
         'code',
     ];
 
@@ -30,6 +31,7 @@ class Evenement extends Model
             'open' => 'boolean',
             'telefoon_betaling' => 'boolean',
             'munten_terugstorten' => 'boolean',
+            'munt_prijs' => 'decimal:2',
             'start_datum' => 'datetime',
             'eind_datum' => 'datetime',
         ];
@@ -37,36 +39,36 @@ class Evenement extends Model
 
     public function groepen(): HasMany
     {
-        return $this->hasMany(Groep::class, 'event_id');
+        return $this->hasMany(Groep::class, 'evenement_id');
     }
 
     public function tickets(): HasMany
     {
-        return $this->hasMany(Ticket::class, 'event_id');
+        return $this->hasMany(Ticket::class, 'evenement_id');
     }
 
     public function producten(): HasMany
     {
-        return $this->hasMany(Product::class, 'event_id');
+        return $this->hasMany(Product::class, 'evenement_id');
     }
 
     public function kaarten(): HasMany
     {
-        return $this->hasMany(Kaart::class, 'event_id');
+        return $this->hasMany(Kaart::class, 'evenement_id');
     }
 
     public function opwaarderingen(): HasMany
     {
-        return $this->hasMany(Opwaardering::class, 'event_id');
+        return $this->hasMany(Opwaardering::class, 'evenement_id');
     }
 
     public function transacties(): HasMany
     {
-        return $this->hasMany(Transactie::class, 'event_id');
+        return $this->hasMany(Transactie::class, 'evenement_id');
     }
 
     public function munten(): HasMany
     {
-        return $this->hasMany(Munt::class, 'event_id');
+        return $this->hasMany(Munt::class, 'evenement_id');
     }
 }

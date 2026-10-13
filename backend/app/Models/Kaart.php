@@ -10,7 +10,7 @@ class Kaart extends Model
 {
     use HasFactory;
 
-    protected $table = 'Kaarten';
+    protected $table = 'kaarten';
 
     public $timestamps = false;
 
@@ -18,7 +18,7 @@ class Kaart extends Model
         'uid',
         'type',
         'actief',
-        'event_id',
+        'evenement_id',
         'gebruiker_id',
     ];
 
@@ -31,7 +31,7 @@ class Kaart extends Model
 
     public function evenement(): BelongsTo
     {
-        return $this->belongsTo(Evenement::class, 'event_id');
+        return $this->belongsTo(Evenement::class, 'evenement_id');
     }
 
     public function gebruiker(): BelongsTo

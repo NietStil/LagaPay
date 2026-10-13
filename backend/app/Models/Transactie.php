@@ -11,16 +11,18 @@ class Transactie extends Model
 {
     use HasFactory;
 
-    protected $table = 'Transacties';
+    protected $table = 'transacties';
 
-    public $timestamps = false;
+    public $timestamps = true;
 
     protected $fillable = [
         'gebruiker_id',
-        'event_id',
+        'evenement_id',
         'groep_id',
         'hoeveelheid',
         'type',
+        'created_at',
+        'updated_at',
     ];
 
     protected function casts(): array
@@ -37,7 +39,7 @@ class Transactie extends Model
 
     public function evenement(): BelongsTo
     {
-        return $this->belongsTo(Evenement::class, 'event_id');
+        return $this->belongsTo(Evenement::class, 'evenement_id');
     }
 
     public function groep(): BelongsTo

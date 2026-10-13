@@ -7,12 +7,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class Gebruiker extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
-    protected $table = 'Gebruikers';
+    protected $table = 'gebruikers';
 
     public $timestamps = false;
 
@@ -47,7 +48,7 @@ class Gebruiker extends Authenticatable
 
     public function groepen(): BelongsToMany
     {
-        return $this->belongsToMany(Groep::class, 'Gebruiker_Groep', 'gebruiker_id', 'groep_id');
+        return $this->belongsToMany(Groep::class, 'gebruiker_groep', 'gebruiker_id', 'groep_id')->withTimestamps();
     }
 
     public function opwaarderingen(): HasMany
@@ -63,5 +64,10 @@ class Gebruiker extends Authenticatable
     public function munten(): HasMany
     {
         return $this->hasMany(Munt::class, 'gebruiker_id');
+    }
+
+    public function tickets()
+    {
+        return $this->belongsToMany(Ticket::class, 'gebruiker_ticket', 'gebruiker_id', 'ticket_id');
     }
 }

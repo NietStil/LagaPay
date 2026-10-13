@@ -10,13 +10,13 @@ class Munt extends Model
 {
     use HasFactory;
 
-    protected $table = 'Munten';
+    protected $table = 'munten';
 
     public $timestamps = false;
 
     protected $fillable = [
         'gebruiker_id',
-        'event_id',
+        'evenement_id',
         'groep_id',
         'hoeveelheid',
         'laatste_transactie',
@@ -36,7 +36,7 @@ class Munt extends Model
 
     public function evenement(): BelongsTo
     {
-        return $this->belongsTo(Evenement::class, 'event_id');
+        return $this->belongsTo(Evenement::class, 'evenement_id');
     }
 
     public function groep(): BelongsTo
