@@ -8,7 +8,15 @@ module.exports = {
   ],
   presets: [require("nativewind/preset")],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        lagared: {
+          DEFAULT: '#ea1a35',
+          light: '#f48a97',
+          dark: '#b2071b',
+        },
+      },
+    },
   },
   plugins: [],
 };

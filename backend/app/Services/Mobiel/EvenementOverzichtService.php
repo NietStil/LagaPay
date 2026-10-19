@@ -7,6 +7,7 @@ use App\Models\Gebruiker;
 use App\Models\Munt;
 use App\Models\Transactie;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class EvenementOverzichtService {
     public const FILTERS = ['alles', 'opwaarderingen', 'uitgaven'];
@@ -38,11 +39,19 @@ class EvenementOverzichtService {
             ->map(fn (Transactie $transactie) => $this->weergave->transactie($transactie))
             ->all();
 
+        $groep = $this->toegang->mijnGroep($gebruiker->id, $evenement->id);
+        $betaalbron = DB::table('gebruiker_evenement')
+            ->where('gebruiker_id', $gebruiker->id)
+            ->where('evenement_id', $evenement->id)
+            ->value('betaalbron');
+
         return [
             'evenement'  => $this->weergave->evenementBasis($evenement),
             'saldo'      => $this->saldo($gebruiker->id, $evenement->id),
             'activiteit' => $activiteit,
-            'groep'      => $this->weergave->groepKort($this->toegang->mijnGroep($gebruiker->id, $evenement->id)),
+            'groep'      => $this->weergave->groepKort($groep),
+            // My groep's id when I last switched to the Groep page (and am still in that groep): the app opens there.
+            'betaalbron' => $groep && (int) $betaalbron === $groep->id ? $groep->id : null,
         ];
     }
 

@@ -7,9 +7,9 @@ const SLEUTEL = 'lagapay.pendingLink';
 /** A pending link older than this is ignored (e.g. the user gave up and logged in much later). */
 const MAX_LEEFTIJD_MS = 60 * 60 * 1000;
 
-const PAD_PATROON = /^\/(e|g)\/[A-Za-z0-9_-]+\/?$/;
+const PAD_PATROON = /^\/(e|g|t)\/[A-Za-z0-9_-]+\/?$/;
 
-/** True for app paths that may be stored as pending link: "/e/{code}" or "/g/{code}". */
+/** True for app paths that may be stored as pending link: "/e/{code}", "/g/{code}" or "/t/{code}". */
 export function isPendingLinkPad(pad: string): boolean {
   return PAD_PATROON.test(pad);
 }

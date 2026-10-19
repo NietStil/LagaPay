@@ -7,14 +7,13 @@ import { kleuren } from './kleuren';
  * Bottom tab bar from the design (Main.dc.html): zinc-950, zinc-800 top border, 24px icon above an
  * 11px semibold label; active purple-300, inactive zinc-400. Used as `tabBar` in (tabs)/_layout.tsx.
  * Each Tabs.Screen provides `title` and `tabBarIcon`.
+ * The bottom safe area is handled by the SafeAreaView in app/_layout.tsx.
  */
-export function LagaTabBar({ state, descriptors, navigation, insets }: BottomTabBarProps) {
+export function LagaTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   return (
     <View
       accessibilityRole="tablist"
-      className="flex-row justify-around border-t border-zinc-800 bg-zinc-950 px-6 pt-2.5"
-      // Design: 24px bottom padding on a phone with a 34px home indicator.
-      style={{ paddingBottom: Math.max(insets.bottom - 10, 10) }}
+      className="flex-row justify-around border-t border-zinc-800 bg-zinc-950 px-6 pb-2.5 pt-2.5"
     >
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];

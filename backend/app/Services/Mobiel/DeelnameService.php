@@ -9,13 +9,15 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Who may become deelnemer of an evenement. Without tickets: anyone with the link while the evenement is open.
- * With tickets: only with a ticket, and only once the evenement has started. Until then, opening the link
- * shows the tickets and is remembered in bekeken_evenementen ("Recent bekeken" on the Tickets tab).
+ * With tickets: only once one of my tickets was scanned at the entrance (TicketScanService then makes me a
+ * deelnemer right away). Until then, opening the link shows the tickets and is remembered in bekeken_evenementen
+ * ("Recent bekeken" on the Tickets tab).
  */
 class DeelnameService {
     public function __construct(
         protected Weergave $weergave,
         protected EvenementService $evenementService,
+        protected TicketMuntenService $ticketMunten,
     ) {}
 
     /**
@@ -44,21 +46,21 @@ class DeelnameService {
     }
 
     /**
-     * Makes me a deelnemer; nothing happens when I already am one.
+     * Makes me a deelnemer (nothing to do when I already am one) and credits the munten included with my tickets.
      *
      * @throws DeelnameGeweigerd
      */
     public function deelnemen(Gebruiker $gebruiker, Evenement $evenement): void {
-        if ($this->controleer($gebruiker, $evenement)) {
-            return;
+        if (! $this->controleer($gebruiker, $evenement)) {
+            $this->evenementService->joinByCode($evenement->code, $gebruiker->id);
         }
 
-        $this->evenementService->joinByCode($evenement->code, $gebruiker->id);
+        $this->ticketMunten->uitkeren($gebruiker, $evenement);
     }
 
     /**
      * Checks that I am, or may become, a deelnemer. Returns true when I already am one. When a ticket is
-     * missing or the evenement hasn't started, the view is remembered so the app can show the tickets.
+     * missing or wasn't scanned yet, the view is remembered so the app can show the tickets.
      *
      * @throws DeelnameGeweigerd
      */
@@ -89,10 +91,11 @@ class DeelnameService {
 
     protected function status(Evenement $evenement, array $feiten): array {
         return [
-            'is_deelnemer'  => $feiten['is_deelnemer'],
-            'heeft_ticket'  => $feiten['heeft_ticket'],
-            'gestart'       => $this->gestart($evenement),
-            'kan_deelnemen' => ! $feiten['is_deelnemer'] && $this->reden($evenement, $feiten) === null,
+            'is_deelnemer'   => $feiten['is_deelnemer'],
+            'heeft_ticket'   => $feiten['heeft_ticket'],
+            'ticket_gescand' => $feiten['ticket_gescand'],
+            'gestart'        => $this->gestart($evenement),
+            'kan_deelnemen'  => ! $feiten['is_deelnemer'] && $this->reden($evenement, $feiten) === null,
         ];
     }
 
@@ -104,13 +107,8 @@ class DeelnameService {
         if ($feiten['geblokkeerd']) {
             return DeelnameGeweigerd::GEBLOKKEERD;
         }
-        if ($evenement->heeft_tickets) {
-            if (! $feiten['heeft_ticket']) {
-                return DeelnameGeweigerd::TICKET_NODIG;
-            }
-            if (! $this->gestart($evenement)) {
-                return DeelnameGeweigerd::NIET_GESTART;
-            }
+        if ($evenement->heeft_tickets && ! $feiten['ticket_gescand']) {
+            return $feiten['heeft_ticket'] ? DeelnameGeweigerd::NIET_GESCAND : DeelnameGeweigerd::TICKET_NODIG;
         }
 
         return null;
@@ -120,7 +118,7 @@ class DeelnameService {
         return $evenement->start_datum !== null && $evenement->start_datum->lte(now());
     }
 
-    /** @return array{is_deelnemer: bool, geblokkeerd: bool, heeft_ticket: bool} */
+    /** @return array{is_deelnemer: bool, geblokkeerd: bool, heeft_ticket: bool, ticket_gescand: bool} */
     protected function feiten(int $gebruikerId, Evenement $evenement): array {
         $geblokkeerd = DB::table('gebruiker_evenement')
             ->where('gebruiker_id', $gebruikerId)
@@ -130,9 +128,18 @@ class DeelnameService {
         return [
             'is_deelnemer' => $geblokkeerd !== null && ! $geblokkeerd,
             'geblokkeerd'  => (bool) $geblokkeerd,
+            // A ticket I put on offer for a friend isn't mine to join with.
             'heeft_ticket' => DB::table('gebruiker_ticket')
                 ->join('tickets', 'tickets.id', '=', 'gebruiker_ticket.ticket_id')
                 ->where('gebruiker_ticket.gebruiker_id', $gebruikerId)
+                ->where('gebruiker_ticket.te_geven', false)
+                ->where('tickets.evenement_id', $evenement->id)
+                ->exists(),
+            // Scanned at the entrance; also a ticket I had put on offer but used myself.
+            'ticket_gescand' => DB::table('gebruiker_ticket')
+                ->join('tickets', 'tickets.id', '=', 'gebruiker_ticket.ticket_id')
+                ->where('gebruiker_ticket.gebruiker_id', $gebruikerId)
+                ->where('gebruiker_ticket.gebruikt', true)
                 ->where('tickets.evenement_id', $evenement->id)
                 ->exists(),
         ];

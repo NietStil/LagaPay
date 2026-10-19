@@ -1,8 +1,7 @@
-import { useContext, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, type Href } from 'expo-router';
-import { BottomTabBarHeightContext } from 'expo-router/js-tabs';
 
 import { Icon } from './icon';
 import { kleuren } from './kleuren';
@@ -26,18 +25,15 @@ export interface ScreenProps {
 /**
  * Full-screen page: zinc-950 background, safe-area top padding + 16px, 20px side padding,
  * `gap` between children, ScrollView with optional pull-to-refresh and sticky `footer`.
- * Inside the tab navigator the tab bar takes care of the bottom safe area; on pushed screens
- * the bottom inset is added automatically.
+ * The bottom safe area is handled by the SafeAreaView in app/_layout.tsx.
  */
 export function Screen({ children, gap = 18, onRefresh, refreshing = false, footer, scroll = true }: ScreenProps) {
   const insets = useSafeAreaInsets();
-  const inTabs = useContext(BottomTabBarHeightContext) !== undefined;
 
   const paddingTop = Math.max(insets.top + 16, 24);
-  const paddingBottom = 24 + (inTabs || footer ? 0 : insets.bottom);
   const inhoudStijl = {
     paddingTop,
-    paddingBottom,
+    paddingBottom: 24,
     paddingHorizontal: 20,
     gap,
     width: '100%',
@@ -78,10 +74,7 @@ export function Screen({ children, gap = 18, onRefresh, refreshing = false, foot
       )}
 
       {footer ? (
-        <View
-          className="border-t border-zinc-800 bg-zinc-950 px-5 pt-4"
-          style={{ paddingBottom: Math.max(insets.bottom, 16) }}
-        >
+        <View className="border-t border-zinc-800 bg-zinc-950 px-5 pb-4 pt-4">
           <View style={{ width: '100%', maxWidth: MAX_BREEDTE - 40, alignSelf: 'center' }}>{footer}</View>
         </View>
       ) : null}

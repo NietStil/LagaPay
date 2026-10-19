@@ -3,14 +3,16 @@
 // Accepted forms (see app-design/API.md "Deep links"):
 //   https://lagapay.nl/e/{code}    lagapay://e/{code}    lagapay.nl/e/{code}
 //   https://lagapay.nl/g/{code}    lagapay://g/{code}
+//   https://lagapay.nl/t/{code}    lagapay://t/{code}    (a ticket a friend bought for you)
 //   exp://192.168.1.2:8081/--/e/{code}   (Expo Go / dev client)
 // Query strings and hashes are ignored; a trailing slash is allowed.
 
 export type LagaPayLink =
   | { soort: 'evenement'; code: string; pad: `/e/${string}` }
-  | { soort: 'groep'; code: string; pad: `/g/${string}` };
+  | { soort: 'groep'; code: string; pad: `/g/${string}` }
+  | { soort: 'ticket'; code: string; pad: `/t/${string}` };
 
-const PAD_PATROON = /^\/(e|g)\/([A-Za-z0-9_-]+)\/?$/;
+const PAD_PATROON = /^\/(e|g|t)\/([A-Za-z0-9_-]+)\/?$/;
 
 /** Returns the evenement/groep link inside `data`, or null when it isn't a LagaPay join link. */
 export function parseLagaPayLink(data: string): LagaPayLink | null {
@@ -41,7 +43,7 @@ export function parseLagaPayLink(data: string): LagaPayLink | null {
   const m = PAD_PATROON.exec(rest);
   if (!m) return null;
   const code = m[2];
-  return m[1] === 'e'
-    ? { soort: 'evenement', code, pad: `/e/${code}` }
-    : { soort: 'groep', code, pad: `/g/${code}` };
+  if (m[1] === 'e') return { soort: 'evenement', code, pad: `/e/${code}` };
+  if (m[1] === 'g') return { soort: 'groep', code, pad: `/g/${code}` };
+  return { soort: 'ticket', code, pad: `/t/${code}` };
 }

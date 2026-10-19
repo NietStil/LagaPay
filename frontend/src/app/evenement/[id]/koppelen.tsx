@@ -1,13 +1,13 @@
 // Screens 10 + 12 — Kaart koppelen (KaartKoppelen.dc.html / KaartKoppelenGroep.dc.html).
-// Params: id, soort = 'persoonlijk' (default) | 'groep'.
-// NFC is out of scope, so the "Scan je kaart" part of the design is left out: the only way to fill the
-// slot from the app is "Gebruik mijn permanente kaart".
+// Params: id, soort = 'persoonlijk' (default) | 'groep'. Opened from "Kaarten" on the Persoonlijk page and from
+// "Groepskaart" on the Groep page.
+// The scan part (rings + "Scan je kaart") is only the design: reading NFC tags isn't built yet. Until then the
+// slot is filled with "Gebruik mijn permanente kaart".
 
-import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Animated, Easing, Pressable, Text, View } from 'react-native';
 import { useLocalSearchParams, type Href } from 'expo-router';
 
-import { KaartIntro, laadKaartenScherm } from '@/components/kaarten/kaart-slot';
 import {
   EmptyState,
   ErrorBanner,
@@ -22,18 +22,24 @@ import {
   kleuren,
 } from '@/components/lagapay';
 import { useApiData } from '@/hooks/use-api-data';
-import { foutmelding, koppelPermanenteKaart } from '@/lib/api/lagapay';
+import { foutmelding, getEvenementKaarten, getEvenementOverzicht, koppelPermanenteKaart } from '@/lib/api/lagapay';
 import type { Kaart, KaartSoort } from '@/lib/api/types';
 import { maskUid } from '@/lib/format';
 import { meld } from '@/lib/melding';
+
+/** The evenement (naam, open) plus my kaart slots. */
+async function laad(evenementId: string) {
+  const [overzicht, kaarten] = await Promise.all([getEvenementOverzicht(evenementId), getEvenementKaarten(evenementId)]);
+  return { evenement: overzicht.evenement, kaarten };
+}
 
 export default function KoppelenScreen() {
   const params = useLocalSearchParams<{ id: string; soort?: string }>();
   const id = params.id;
   const soort: KaartSoort = params.soort === 'groep' ? 'groep' : 'persoonlijk';
-  const terugHref: Href = soort === 'groep' ? `/evenement/${id}/kaarten-groep` : `/evenement/${id}/kaarten`;
+  const terugHref: Href = soort === 'groep' ? `/evenement/${id}/groep` : `/evenement/${id}`;
 
-  const { data, error, loading, reload } = useApiData(() => laadKaartenScherm(id), [id]);
+  const { data, error, loading, reload } = useApiData(() => laad(id), [id]);
   const [bezig, setBezig] = useState(false);
   const [fout, setFout] = useState<string | null>(null);
 
@@ -41,19 +47,11 @@ export default function KoppelenScreen() {
     <ScreenHeader title="Kaart koppelen" subtitle={subtitle} fallbackHref={terugHref} />
   );
 
-  if (loading) {
-    return (
-      <Screen gap={20}>
-        {kop()}
-        <LoadingState />
-      </Screen>
-    );
-  }
   if (!data) {
     return (
       <Screen gap={20}>
         {kop()}
-        <ErrorState message={error ?? ''} onRetry={reload} />
+        {loading ? <LoadingState /> : <ErrorState message={error ?? ''} onRetry={reload} />}
       </Screen>
     );
   }
@@ -100,30 +98,34 @@ export default function KoppelenScreen() {
         text="Word lid via de uitnodigingslink van een groep om een groepskaart te koppelen."
       />
     );
-  } else if (!permanent) {
-    inhoud = (
-      <EmptyState
-        icon="card"
-        title="Je hebt nog geen permanente kaart"
-        text={
-          soort === 'persoonlijk'
-            ? 'Een kaart scannen kan nog niet in de app. Krijg je een kaart bij het evenement, dan wordt die vanzelf je persoonlijke kaart.'
-            : 'Een kaart scannen kan nog niet in de app. Zonder permanente kaart kun je hier nog geen groepskaart koppelen.'
-        }
-      />
-    );
   } else {
-    const gekoppeld = huidig?.id === permanent.id;
-    const vervangt = huidig && !gekoppeld ? ` Dit vervangt je huidige kaart (${maskUid(huidig.uid_laatste4)}).` : '';
     inhoud = (
       <>
-        <KaartIntro>
-          {(soort === 'groep' && groep
-            ? `Koppel je permanente kaart om met het saldo van ${groep.naam} te betalen.`
-            : 'Koppel je permanente kaart om met je eigen saldo te betalen.') + vervangt}
-        </KaartIntro>
-        <PermanenteKaartOptie kaart={permanent} gekoppeld={gekoppeld} bezig={bezig} onPress={koppel} />
+        <View className="flex-1 items-center justify-center py-6">
+          <ScanRingen />
+          <Text className="mt-7 text-2xl font-bold tracking-[-0.4px] text-zinc-50">Scan je kaart</Text>
+          <Text className="mt-2.5 px-6 text-center text-[15px] leading-[22px] text-zinc-400">
+            Houd de kaart of polsband tegen de achterkant van je telefoon.
+          </Text>
+          {huidig ? (
+            <Text className="mt-3 text-[13px] text-zinc-500">
+              Huidige kaart: <Text className="font-mono">{maskUid(huidig.uid_laatste4)}</Text>
+            </Text>
+          ) : null}
+        </View>
+
         {fout ? <ErrorBanner message={fout} /> : null}
+
+        {permanent ? (
+          <View className="gap-4">
+            <View className="flex-row items-center gap-3">
+              <View className="h-px flex-1 bg-zinc-800" />
+              <Text className="text-[13px] text-zinc-400">of</Text>
+              <View className="h-px flex-1 bg-zinc-800" />
+            </View>
+            <PermanenteKaartOptie kaart={permanent} gekoppeld={huidig?.id === permanent.id} bezig={bezig} onPress={koppel} />
+          </View>
+        ) : null}
       </>
     );
   }
@@ -134,6 +136,52 @@ export default function KoppelenScreen() {
       <Pill label={voorLabel} tone="accent" size="md" />
       {inhoud}
     </Screen>
+  );
+}
+
+/** Design: three purple rings around a purple-700 circle with the NFC icon; the rings pulse slowly. */
+function ScanRingen() {
+  const puls = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animatie = Animated.loop(
+      Animated.sequence([
+        Animated.timing(puls, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(puls, { toValue: 0, duration: 1400, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ]),
+    );
+    animatie.start();
+    return () => animatie.stop();
+  }, [puls]);
+
+  // The outer rings breathe a little more than the inner one.
+  const ring = (grootte: number, kleur: string, schaal: number) => (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        width: grootte,
+        height: grootte,
+        borderRadius: grootte / 2,
+        backgroundColor: kleur,
+        transform: [{ scale: puls.interpolate({ inputRange: [0, 1], outputRange: [1, schaal] }) }],
+        opacity: puls.interpolate({ inputRange: [0, 1], outputRange: [1, 0.75] }),
+      }}
+    />
+  );
+
+  return (
+    <View
+      accessibilityRole="image"
+      accessibilityLabel="Klaar om je kaart te scannen"
+      className="h-[260px] w-[260px] items-center justify-center"
+    >
+      {ring(260, '#1a0b2e', 1.04)}
+      {ring(200, '#2e1065', 1.06)}
+      {ring(136, '#4c1d95', 1.08)}
+      <View className="h-[84px] w-[84px] items-center justify-center rounded-full bg-purple-700">
+        <Icon name="nfc" size={40} color="#ffffff" />
+      </View>
+    </View>
   );
 }
 

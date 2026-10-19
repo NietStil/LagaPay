@@ -1,4 +1,5 @@
-// Screen 1 — Tickets tab (MijnTickets.dc.html): gekochte tickets and evenementen without a ticket yet.
+// Screen 1 — Tickets tab (MijnTickets.dc.html): my bought tickets (one card per evenement, opening their QR codes)
+// and evenementen without a ticket yet. "Evenement toevoegen" (QR code or evenement code) is always on top, to buy tickets.
 
 import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
@@ -11,6 +12,7 @@ import {
   ErrorBanner,
   ErrorState,
   Icon,
+  ListRow,
   LoadingState,
   Screen,
   SectionLabel,
@@ -20,7 +22,7 @@ import {
 } from '@/components/lagapay';
 import { useApiData } from '@/hooks/use-api-data';
 import { getMijnTickets } from '@/lib/api/lagapay';
-import type { GekochtTicket, RecentBekeken } from '@/lib/api/types';
+import type { GekochteTickets, RecentBekeken } from '@/lib/api/types';
 import { formatDatum, formatDatumBereikKort, formatEuro, formatMunten } from '@/lib/format';
 
 export default function TicketsScreen() {
@@ -50,8 +52,8 @@ export default function TicketsScreen() {
           <View>
             <SectionLabel>Gekocht</SectionLabel>
             <View className="gap-3">
-              {data.gekocht.map((ticket) => (
-                <TicketKaart key={ticket.id} ticket={ticket} />
+              {data.gekocht.map((gekocht) => (
+                <TicketKaart key={gekocht.evenement.id} gekocht={gekocht} />
               ))}
             </View>
           </View>
@@ -73,23 +75,40 @@ export default function TicketsScreen() {
   return (
     <Screen gap={20} onRefresh={loading ? undefined : refresh} refreshing={refreshing}>
       <TabTitle>Tickets</TabTitle>
+      <ListRow
+        variant="plain"
+        icon="scan"
+        title="Evenement toevoegen"
+        subtitle="Scan een QR-code of vul de code in"
+        onPress={() => router.push('/toevoegen')}
+      />
       {inhoud}
     </Screen>
   );
 }
 
-/** Ticket card: naam + ticket type/dates + status, dashed strip with included munten and "Bekijk". */
-function TicketKaart({ ticket }: { ticket: GekochtTicket }) {
-  const { evenement } = ticket;
-  const regel = `${ticket.naam} · ${formatDatumBereikKort(evenement.start_datum, evenement.eind_datum)}`;
-  const munten = ticket.munten ? `Incl. ${formatMunten(ticket.munten)}` : null;
+/**
+ * My tickets of one evenement: naam, "2× Dagticket, VIP" + dates, status, and a dashed strip with the included
+ * munten / how many were used. Opens the swipeable QR codes.
+ */
+function TicketKaart({ gekocht }: { gekocht: GekochteTickets }) {
+  const { evenement } = gekocht;
+  const soorten = gekocht.soorten.map((soort) => (soort.aantal > 1 ? `${soort.aantal}× ${soort.naam}` : soort.naam)).join(', ');
+  const regel = `${soorten} · ${formatDatumBereikKort(evenement.start_datum, evenement.eind_datum)}`;
+  const alleGebruikt = gekocht.aantal_gebruikt === gekocht.aantal;
+  const strip = [
+    gekocht.munten ? `Incl. ${formatMunten(gekocht.munten)}` : null,
+    gekocht.aantal_te_geven > 0 ? `${gekocht.aantal_te_geven} voor vrienden` : null,
+    gekocht.aantal_gebruikt > 0 && !alleGebruikt ? `${gekocht.aantal_gebruikt} van ${gekocht.aantal} gebruikt` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <Card
       radius={20}
-      // Not a deelnemer yet (evenement with tickets that hasn't started, or not joined): its tickets screen.
-      onPress={() => router.push(evenement.is_deelnemer ? `/evenement/${evenement.id}` : `/evenement/${evenement.id}/tickets`)}
-      accessibilityLabel={`${evenement.naam}, ${regel}, ${ticket.status === 'geldig' ? 'geldig' : 'verlopen'}. Bekijk evenement`}
+      onPress={() => router.push(`/evenement/${evenement.id}/mijn-tickets`)}
+      accessibilityLabel={`${evenement.naam}, ${regel}. Bekijk ${gekocht.aantal === 1 ? 'ticket' : 'tickets'}`}
       className="overflow-hidden"
     >
       <View className="flex-row items-start justify-between gap-3 px-[18px] py-4">
@@ -97,11 +116,11 @@ function TicketKaart({ ticket }: { ticket: GekochtTicket }) {
           <Text numberOfLines={2} className="text-[17px] font-bold text-zinc-50">
             {evenement.naam}
           </Text>
-          <Text numberOfLines={1} className="mt-1 text-[13px] text-zinc-400">
+          <Text numberOfLines={2} className="mt-1 text-[13px] text-zinc-400">
             {regel}
           </Text>
         </View>
-        <StatusPill status={ticket.status} />
+        {alleGebruikt ? <StatusPill status="inactief" label="Gebruikt" /> : <StatusPill status={gekocht.status} />}
       </View>
 
       <View className="relative flex-row items-center justify-between overflow-hidden bg-[#131316] px-[18px] py-3">
@@ -111,9 +130,11 @@ function TicketKaart({ ticket }: { ticket: GekochtTicket }) {
           pointerEvents="none"
           className="absolute -bottom-1 -left-1 -right-1 top-0 border-[1.5px] border-dashed border-zinc-700"
         />
-        {munten ? <Text className="text-[13px] text-zinc-400">{munten}</Text> : <View />}
+        {strip ? <Text className="text-[13px] text-zinc-400">{strip}</Text> : <View />}
         <View className="flex-row items-center gap-1.5">
-          <Text className="text-[13px] font-semibold text-purple-300">Bekijk</Text>
+          <Text className="text-[13px] font-semibold text-purple-300">
+            {gekocht.aantal === 1 ? 'Bekijk ticket' : `Bekijk ${gekocht.aantal} tickets`}
+          </Text>
           <Icon name="chevron-right" size={16} color={kleuren.purple300} />
         </View>
       </View>

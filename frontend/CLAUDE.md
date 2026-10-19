@@ -41,14 +41,14 @@ src/
     (tabs)/index.tsx            Evenementen (initial tab, `/`)
     (tabs)/tickets.tsx          Mijn tickets
     (tabs)/profiel.tsx          Profiel
-    toevoegen.tsx               Evenement toevoegen: QR scanner (expo-camera)
+    toevoegen.tsx               Evenement toevoegen: QR scanner (expo-camera) + evenement code field (or pasted link)
     e/[code].tsx, g/[code].tsx  Join deep links (evenement / groep) → replace to the evenement
+    t/[code].tsx                Ticket a friend bought for me: takes it, opens the evenement (or its tickets until scanned)
     wachtwoord.tsx              Wachtwoord wijzigen
     evenement/[id]/_layout.tsx  Stack for one evenement (no headers)
     evenement/[id]/index.tsx    Overzicht persoonlijk (open/gesloten)  ⇄  groep.tsx (Groep)
-    evenement/[id]/kaarten.tsx  Kaart persoonlijk  ⇄  kaarten-groep.tsx
-    evenement/[id]/koppelen.tsx ?soort=persoonlijk|groep · opwaarderen.tsx ?voor=persoonlijk|groep
-    evenement/[id]/transacties.tsx, tickets.tsx (Tickets kopen)
+    evenement/[id]/koppelen.tsx Kaart koppelen ?soort=persoonlijk|groep (NFC scan design, no NFC yet) · opwaarderen.tsx ?voor=persoonlijk|groep
+    evenement/[id]/transacties.tsx, tickets.tsx (Tickets kopen), mijn-tickets.tsx (swipeable ticket QR codes)
   components/lagapay/           Shared LagaPay UI, import from '@/components/lagapay' (index.ts barrel):
                                 Screen, ScreenHeader, TabTitle, BackButton, Icon, Card, ListRow, IconBox, Tile,
                                 InfoNote, HeroCard, Button/HeroButton, Pill/StatusPill, SegmentedTabs/EvenementTabs,
@@ -60,7 +60,7 @@ src/
   lib/api/lagapay.ts, types.ts  Typed API calls + shapes (contract: app-design/API.md), foutmelding(err)
   lib/format.ts                 Dutch date/money/munten formatting (hand-rolled, no Intl)
   lib/melding.ts                meld / bevestig / nietBeschikbaar (cross-platform alerts)
-  lib/links.ts                  parseLagaPayLink (QR / shared link → /e/{code} | /g/{code})
+  lib/links.ts                  parseLagaPayLink (QR / shared link → /e/{code} | /g/{code} | /t/{code})
   lib/pending-link.ts           Join link opened while logged out, continued after login
   lib/deelnemen.ts              openEvenementLink / openGroepLink: where a link leads (evenement, groep or tickets)
   constants/theme.ts            Template theme constants (not used by the LagaPay screens)
@@ -73,10 +73,12 @@ app-design/                     Design screens (*.dc.html), README (spec) and AP
 - **Auth flow**: `AuthProvider` loads the stored `token`, calls `GET /user`, and exposes `user`, `isAuthenticated`, `login`, `register`, `loginWithGoogle` (browser auth session on `${BASE_URL}/auth/google`, token returned via redirect query param), `loginWithGoogleToken`, `logout`, `refreshUser`. `_layout.tsx` redirects unauthenticated users to `/login` and authenticated users away from `/login` / `/register`. New public routes must be added to the `inAuthGroup` check there.
 - **API client** (`src/lib/api/client.ts`): custom `fetch` wrapper (not axios, although `axios` is in package.json) exposing `get/post/put/delete`, JSON-encodes object bodies, attaches `Authorization: Bearer <token>`, throws errors shaped like `{ response: { status, data }, status }`, clears the token on 401/302, and calls a maintenance-modal callback on 503. Auth endpoints (`/login`, `/register`, `/logout`, `/user`, `/auth/google/token`) are called from `auth-context.tsx`; the app endpoints (evenementen, groepen, kaarten, tickets, profiel) have typed functions in `src/lib/api/lagapay.ts`.
 - **Theming**: dark-only (zinc-950 background, purple-700 accent, zinc neutrals), Tailwind default palette via NativeWind classes. The design's hex values map to Tailwind colors (`#18181b` zinc-900, `#d8b4fe` purple-300, ...); the two off-palette greys use `bg-[#111113]` / `bg-[#131316]`. Hex constants for non-className props are in `kleuren` (`components/lagapay/kleuren.ts`).
-- **Navigation**: three bottom tabs; everything else is pushed on the root Stack without tab bar. Inside an evenement, Persoonlijk|Groep switches use `router.replace` between sibling routes (`EvenementTabs` / `wisselEvenementTab`) so back returns to the screen before the pair. `ScreenHeader`'s back falls back to `/` when there is no history (deep links).
-- **Joining (deelname)**: evenementen without tickets: the link joins right away. With tickets: the link opens the tickets screen (`evenement/[id]/tickets.tsx`) until you have a ticket and the evenement has started; then the link joins right away, or "Deelnemen" on that screen. Rules live in the backend (`DeelnameService`); the app follows `deelname` from `POST /evenementen/bekijk` via `lib/deelnemen.ts`.
+- **Navigation**: three bottom tabs; everything else is pushed on the root Stack without tab bar. Inside an evenement, Persoonlijk|Groep switches use `router.replace` between sibling routes (`EvenementTabs` / `wisselEvenementTab`) so back returns to the screen before the pair. Each switch also stores the chosen side as my betaalbron (`PUT /evenementen/{id}/betaalbron`, `gebruiker_evenement.betaalbron` = groep id or null). An evenement always opens on `index.tsx`, which moves on to Groep when `betaalbron` is set (`startTab`; a side picked earlier in the same app session wins, since the save runs in the background). `ScreenHeader`'s back falls back to `/` when there is no history (deep links).
+- **Joining (deelname)**: evenementen without tickets: the link joins right away. With tickets: the link opens the tickets screen (`evenement/[id]/tickets.tsx`) until one of your tickets is scanned at the entrance; the scan makes you a deelnemer (only then can you opwaarderen). In development builds "Scan (dev)" on Mijn tickets scans your own ticket (`POST .../dev-scan`, backend `lagapay.dev_scan`). Rules live in the backend (`DeelnameService`); the app follows `deelname` from `POST /evenementen/bekijk` via `lib/deelnemen.ts`.
+- **Tickets for friends**: when buying, "Waarvan voor vrienden" puts tickets on offer (or per ticket on Mijn tickets: "Geef aan een vriend"). One link per buyer per evenement (`/t/{code}`, `components/evenement/uitnodigingslink.tsx`) hands them out; a friend opening it gets a ticket (new code), joins once it is scanned, and then gets that ticket's munten. A ticket's munten are credited to its holder once they are a deelnemer (never for tickets on offer). Rules live in the backend (`TicketOverdrachtService`, `TicketMuntenService`).
 - **Deep links**: `lagapay://e/{code}` / `https://lagapay.nl/e/{code}` (and `/g/`) open `e/[code].tsx` / `g/[code].tsx`. Opened while logged out, the guard stores the path (`lib/pending-link.ts`, AsyncStorage, 1h) and continues there after login/registration. Universal/app links for `https://lagapay.nl` still need `associatedDomains` / `intentFilters` + the server files.
-- **Data loading**: screens use `useApiData` with `Screen onRefresh/refreshing`, `LoadingState`, `ErrorState`. Mollie and NFC actions are out of scope: buttons call `nietBeschikbaar('Opwaarderen')` etc.
+- **Data loading**: screens use `useApiData` with `Screen onRefresh/refreshing`, `LoadingState`, `ErrorState`.
+- **Payments**: no Mollie yet. Opwaarderen and tickets kopen are test betalingen (booked straight away, backend flag `lagapay.test_betalingen`); terugstorten calls `nietBeschikbaar(...)`. NFC is out of scope: Kaart koppelen (opened from "Kaarten" / "Groepskaart") shows the scan design, but only "Gebruik mijn permanente kaart" links a kaart.
 
 ## Gotchas
 

@@ -23,6 +23,22 @@ class GroepController extends Controller
         ]);
     }
 
+    /** Switching between the Persoonlijk and Groep pages: { soort } → { betaalbron: groep id | null }. */
+    public function betaalbron(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'soort' => ['required', 'string', 'in:persoonlijk,groep'],
+        ]);
+
+        return response()->json([
+            'betaalbron' => $this->groepService->kiesBetaalbron(
+                $request->user(),
+                $request->attributes->get('evenement'),
+                $validated['soort'],
+            ),
+        ]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([

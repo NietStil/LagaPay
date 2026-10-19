@@ -15,13 +15,12 @@ export default function EvenementLayout() {
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: kleuren.zinc950 } }}>
       <Stack.Screen name="index" options={wisselAnimatie} />
       <Stack.Screen name="groep" options={wisselAnimatie} />
-      <Stack.Screen name="kaarten" options={wisselAnimatie} />
-      <Stack.Screen name="kaarten-groep" options={wisselAnimatie} />
       <Stack.Screen name="groep-aanmaken" />
       <Stack.Screen name="transacties" />
       <Stack.Screen name="koppelen" />
       <Stack.Screen name="opwaarderen" />
       <Stack.Screen name="tickets" />
+      <Stack.Screen name="mijn-tickets" />
     </Stack>
   );
 }

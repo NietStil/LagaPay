@@ -48,11 +48,10 @@ The old Kaarten tab is removed. Kaarten now live in Profiel (permanent kaart) an
 Everything else is a pushed screen without the tab bar.
 
 ```
-Tickets tab ──> Tickets kopen (13)
-Evenementen tab ──> Evenement toevoegen (4)
-                └─> Evenement open (5 persoonlijk / 6 groep) ──> Opwaarderen (14), Betalen (15),
-                    │                                            Transacties (16), Kaart persoonlijk (9)
-                    │                                            Kaart groep (11)
+Tickets tab ──> Tickets kopen (13), Evenement toevoegen (4)
+Evenementen tab ──> Evenement open (5 persoonlijk / 6 groep) ──> Opwaarderen (14), Betalen (15),
+                    │                                            Transacties (16), Kaart koppelen (10)
+                    │                                            Kaart koppelen groep (12)
                     └─> Evenement gesloten (7 persoonlijk / 8 groep)
 Profiel tab (persoonlijke gegevens, bankkaart, permanente en tijdelijke kaarten)
 ```
@@ -61,7 +60,8 @@ Profiel tab (persoonlijke gegevens, bankkaart, permanente en tijdelijke kaarten)
 
 - **Evenement**: can be open or gesloten. It has a start and eind datum and a `munt_prijs`.
   Three options affect the app:
-  - `heeft_tickets`: tickets can be bought. Without it there are no tickets, and people join by QR or link.
+  - `heeft_tickets`: tickets can be bought. Without it there are no tickets, and people join by QR or link. With it, you only become
+    a deelnemer (and can buy munten) once your ticket is scanned at the entrance.
   - `telefoon_betaling`: paying with the phone via NFC is available.
   - `munten_terugstorten`: munten can be returned after the evenement.
 - **Munten**: the coin balance per evenement. There is a personal balance and a group balance.
@@ -70,7 +70,7 @@ Profiel tab (persoonlijke gegevens, bankkaart, permanente en tijdelijke kaarten)
 - **Kaarten**:
   - One kaart per evenement for persoonlijk and one for groep.
   - One permanent kaart per account (in Profiel). It can be chosen when linking a kaart.
-- **Joining**: by scanning a QR code. The evenement code is only used inside the link that the QR code (and shared links) point to. The user never types a code.
+- **Joining**: by scanning a QR code, or by typing the evenement code (15 characters) on Evenement toevoegen. The same code is inside the link that the QR code (and shared links) point to.
 
 ## 4. Screens
 
@@ -79,14 +79,16 @@ Each entry names the file in `screens/`.
 ### 4.1 Tabs
 
 **1. Tickets tab (`MijnTickets.dc.html`)**
+- "Evenement toevoegen" row under the title (scan a QR code or type the code). It opens screen 4.
 - "Gekocht": ticket cards with evenement name, ticket type, dates, status (Geldig), included munten.
 - "Recent bekeken, nog geen ticket": evenementen the user visited but has not bought a ticket for, each with a "Koop ticket" button that opens screen 13.
 - Bottom tab bar, Tickets active.
 
 **2. Evenementen tab (`Main.dc.html`)**
 - Title "Evenementen". No greeting, no filters, no "+" button.
-- "Evenement toevoegen" row at the top, with a separating line underneath. It opens screen 4.
-- Compact evenement cards:
+- No "Evenement toevoegen" row (that is on the Tickets tab). With no evenementen, a small note: "Nog geen evenementen. Laat je ticket
+  scannen bij de ingang om toegang te krijgen tot een evenement."
+- Compact evenement cards, open ones first; the gesloten evenementen come below a separating line:
   - Name and dates on the left.
   - Saldo in the bottom right, with an arrow above it.
   - No "open"/"gesloten" text. Open evenementen are purple. Closed evenementen are grey and slightly dimmed.
@@ -103,7 +105,8 @@ Each entry names the file in `screens/`.
 ### 4.2 Joining an evenement
 
 **4. Evenement toevoegen (`Toevoegen.dc.html`)**
-- QR scanning only. No code field.
+- QR scanner, and below it a field for the evenement code (a pasted link works too) with a "Toevoegen" button.
+- A code or link follows the same deelname rules as the QR code: an evenement with tickets opens its tickets screen, so you can buy tickets with the code.
 - A note says that opening a link also adds you to the evenement.
 
 ### 4.3 Inside an open evenement
@@ -119,22 +122,22 @@ Each entry names the file in `screens/`.
 - Same layout idea as screen 5.
 - Hero with the groep name and groep balance, plus Opwaarderen.
 - A shareable **link** (not a code) with a "Delen" button.
-- **Groepskaart** row, linking to screen 11.
+- **Groepskaart** row, linking straight to screen 12 (Kaart koppelen, groep).
 - **Leden**: members with the number of munten each has bought.
 - **Groepsactiviteit** timeline.
 
 **9. Kaart persoonlijk (`EvenementKaarten.dc.html`)**
-- Separate page with the tab bar Persoonlijk | Groep.
-- Exactly one kaart slot. Shows the linked kaart (type, masked UID, status) and "Kaart vervangen".
+- Not used: "Kaarten" on screen 5 opens screen 10 directly (scan a new kaart, no overview of the slots).
 
 **10. Kaart koppelen, persoonlijk (`KaartKoppelen.dc.html`)**
 - Label "Voor: Persoonlijk".
-- Scan prompt with an NFC animation: "Scan je kaart".
+- Opened from "Kaarten" on screen 5.
+- Scan prompt with an NFC animation (pulsing rings): "Scan je kaart", plus the current kaart (masked UID) when one is linked.
+  The NFC scan itself isn't built yet.
 - Bottom option: "Gebruik mijn permanente kaart".
 
 **11. Kaart groep (`KaartenGroep.dc.html`)**
-- Separate page for the groep kaart. Exactly one slot.
-- Empty state "Nog geen kaart gekoppeld" with "Kaart koppelen".
+- Not used: "Groepskaart" on screen 6 opens screen 12 directly.
 
 **12. Kaart koppelen, groep (`KaartKoppelenGroep.dc.html`)**
 - Same as screen 10, labelled "Voor: Groep · Team Rood".
@@ -179,7 +182,7 @@ Each entry names the file in `screens/`.
 ## 5. Rules that were decided
 
 1. Bottom tabs are Tickets, Evenementen, Profiel (in that order). No Kaarten tab.
-2. Joining an evenement works with QR codes. The code is only part of the link.
+2. Joining an evenement works with QR codes, or by typing the evenement code on Evenement toevoegen.
 3. Inside an evenement, Persoonlijk and Groep are separate pages reached through a tab bar at the top.
 4. One kaart per evenement for persoonlijk and one for groep. Linking is done by scanning the kaart, or by choosing the permanent kaart at the bottom.
 5. Temporary kaarten belong to an evenement. The permanent kaart belongs to the account and is managed in Profiel.

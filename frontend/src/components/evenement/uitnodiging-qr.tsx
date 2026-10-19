@@ -1,4 +1,5 @@
-// Full-screen QR code of a groep's uitnodigingslink, so another visitor can scan it with the LagaPay app.
+// Full-screen QR code of an uitnodigingslink (a groep, or tickets for friends), so another visitor can scan it
+// with the LagaPay app.
 
 import { Modal, Platform, Pressable, Text, View } from 'react-native';
 import { toDataURL } from 'qrcode';
@@ -8,13 +9,16 @@ import { meld } from '@/lib/melding';
 
 export interface UitnodigingQrProps {
   zichtbaar: boolean;
-  groepNaam: string;
+  /** Heading above the QR code, also used for the downloaded file name. */
+  titel: string;
+  /** One sentence under the heading. */
+  omschrijving: string;
   link: string;
   onDelen: () => void;
   onSluiten: () => void;
 }
 
-export function UitnodigingQr({ zichtbaar, groepNaam, link, onDelen, onSluiten }: UitnodigingQrProps) {
+export function UitnodigingQr({ zichtbaar, titel, omschrijving, link, onDelen, onSluiten }: UitnodigingQrProps) {
   return (
     <Modal visible={zichtbaar} transparent animationType="fade" onRequestClose={onSluiten} statusBarTranslucent>
       {/* No accessibilityRole on the two Pressables: on web that would nest <button>s. */}
@@ -25,10 +29,8 @@ export function UitnodigingQr({ zichtbaar, groepNaam, link, onDelen, onSluiten }
           className="w-full max-w-[360px] items-center gap-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-5"
         >
           <View className="items-center">
-            <Text className="text-lg font-bold text-zinc-50">{groepNaam}</Text>
-            <Text className="mt-1 text-center text-[13px] text-zinc-400">
-              Laat deze QR-code scannen in de LagaPay app om lid te worden van de groep.
-            </Text>
+            <Text className="text-lg font-bold text-zinc-50">{titel}</Text>
+            <Text className="mt-1 text-center text-[13px] text-zinc-400">{omschrijving}</Text>
           </View>
 
           <View className="rounded-2xl bg-white p-2">
@@ -42,7 +44,7 @@ export function UitnodigingQr({ zichtbaar, groepNaam, link, onDelen, onSluiten }
           <View className="gap-2 self-stretch">
             <Button title="Link delen" icon="share" onPress={onDelen} />
             {Platform.OS === 'web' ? (
-              <Button title="Download QR-code" variant="secondary" onPress={() => void downloadQr(link, groepNaam)} />
+              <Button title="Download QR-code" variant="secondary" onPress={() => void downloadQr(link, titel)} />
             ) : null}
             <Button title="Sluiten" variant="outline" onPress={onSluiten} />
           </View>
@@ -53,8 +55,8 @@ export function UitnodigingQr({ zichtbaar, groepNaam, link, onDelen, onSluiten }
 }
 
 /** Web only: saves the QR code as a 1024px PNG. */
-async function downloadQr(link: string, groepNaam: string) {
-  const slug = groepNaam.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'groep';
+async function downloadQr(link: string, titel: string) {
+  const slug = titel.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'uitnodiging';
   try {
     const a = document.createElement('a');
     a.href = await toDataURL(link, {

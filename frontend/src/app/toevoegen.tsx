@@ -1,7 +1,8 @@
-// Screen 4 — Evenement toevoegen (Toevoegen.dc.html): join an evenement or groep by scanning its QR code.
+// Screen 4 — Evenement toevoegen (Toevoegen.dc.html): join an evenement or groep by scanning its QR code,
+// or by typing the evenement code (or pasting a link). Evenementen with tickets open their tickets screen.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Linking, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import { CameraView, PermissionStatus, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { router, useIsFocused } from 'expo-router';
 
@@ -17,11 +18,14 @@ import {
   type IconName,
 } from '@/components/lagapay';
 import { foutmelding } from '@/lib/api/lagapay';
-import { openEvenementLink, openGroepLink } from '@/lib/deelnemen';
-import { parseLagaPayLink } from '@/lib/links';
+import { openEvenementLink, openGroepLink, openTicketLink } from '@/lib/deelnemen';
+import { parseLagaPayLink, type LagaPayLink } from '@/lib/links';
 
 /** The same QR code is ignored for this long after it was handled (the camera reports it every frame). */
 const ZELFDE_CODE_PAUZE_MS = 4000;
+
+/** An evenement code as typed in: 15 nanoid characters (backend `evenementen.code`). */
+const EVENEMENT_CODE = /^[A-Za-z0-9_-]{15}$/;
 
 export default function ToevoegenScreen() {
   const isFocused = useIsFocused();
@@ -31,6 +35,8 @@ export default function ToevoegenScreen() {
   const [cameraFout, setCameraFout] = useState<string | null>(null);
   const [bezig, setBezig] = useState(false);
   const [fout, setFout] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [codeFocus, setCodeFocus] = useState(false);
 
   const bezigRef = useRef(false);
   const vorigeScanRef = useRef<{ data: string; tijd: number } | null>(null);
@@ -66,10 +72,34 @@ export default function ToevoegenScreen() {
 
     const link = parseLagaPayLink(data);
     if (!link) {
-      setFout('Deze QR-code is geen LagaPay-link. Scan de QR-code van het evenement.');
+      setFout(
+        data.startsWith('LAGAPAY-TICKET:')
+          ? 'Dit is een ticket. Laat het scannen bij de ingang van het evenement.'
+          : 'Deze QR-code is geen LagaPay-link. Scan de QR-code van het evenement.',
+      );
       return;
     }
 
+    await openLink(link);
+  };
+
+  // A typed evenement code, or a pasted link (evenement, groep or ticket).
+  const verwerkCode = async () => {
+    if (bezigRef.current) return;
+    const invoer = code.trim();
+    if (!invoer) return;
+
+    const link: LagaPayLink | null =
+      parseLagaPayLink(invoer) ??
+      (EVENEMENT_CODE.test(invoer) ? { soort: 'evenement', code: invoer, pad: `/e/${invoer}` } : null);
+    if (!link) {
+      setFout('Deze code klopt niet. Een evenementcode heeft 15 tekens, of plak de link van het evenement.');
+      return;
+    }
+    await openLink(link);
+  };
+
+  const openLink = async (link: LagaPayLink) => {
     bezigRef.current = true;
     setBezig(true);
     setFout(null);
@@ -77,6 +107,9 @@ export default function ToevoegenScreen() {
       // Evenementen with tickets open their tickets screen until I have a ticket and the evenement has started.
       if (link.soort === 'evenement') {
         const { evenementId, naarTickets } = await openEvenementLink(link.code);
+        router.replace(naarTickets ? `/evenement/${evenementId}/tickets` : `/evenement/${evenementId}`);
+      } else if (link.soort === 'ticket') {
+        const { evenementId, naarTickets } = await openTicketLink(link.code);
         router.replace(naarTickets ? `/evenement/${evenementId}/tickets` : `/evenement/${evenementId}`);
       } else {
         const { evenementId, naarTickets } = await openGroepLink(link.code);
@@ -173,7 +206,7 @@ export default function ToevoegenScreen() {
       <View>
         <TabTitle>Evenement toevoegen</TabTitle>
         <Text className="mt-2 text-[15px] leading-[22px] text-zinc-400">
-          Scan de QR-code van het evenement om deel te nemen.
+          Scan de QR-code van het evenement of vul de evenementcode in om deel te nemen of tickets te kopen.
         </Text>
       </View>
 
@@ -182,6 +215,34 @@ export default function ToevoegenScreen() {
       </View>
 
       {fout ? <ErrorBanner message={fout} /> : null}
+
+      <View className="gap-3">
+        <Text className="text-xs font-semibold uppercase tracking-wider text-zinc-300">Of vul de evenementcode in</Text>
+        <TextInput
+          value={code}
+          onChangeText={(waarde) => {
+            setCode(waarde);
+            if (fout) setFout(null);
+          }}
+          accessibilityLabel="Evenementcode"
+          placeholder="Code of link van het evenement"
+          placeholderTextColor={kleuren.zinc500}
+          selectionColor={kleuren.purple300}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="go"
+          editable={!bezig}
+          onSubmitEditing={() => void verwerkCode()}
+          onFocus={() => setCodeFocus(true)}
+          onBlur={() => setCodeFocus(false)}
+          className={`w-full rounded-2xl border bg-zinc-900 px-4 py-4 text-base text-white ${
+            codeFocus ? 'border-purple-700' : 'border-zinc-800'
+          }`}
+          // Web: no browser focus ring; the border shows the focus instead.
+          style={{ outlineWidth: 0 }}
+        />
+        <Button title="Toevoegen" onPress={() => void verwerkCode()} loading={bezig} disabled={!code.trim()} />
+      </View>
 
       <InfoNote icon="link">
         Heb je een link gekregen? Open die op je telefoon, dan kom je vanzelf bij het evenement.

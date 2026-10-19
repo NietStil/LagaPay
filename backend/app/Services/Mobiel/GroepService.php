@@ -8,7 +8,6 @@ use App\Models\Groep;
 use App\Models\KaartKoppeling;
 use App\Models\Munt;
 use App\Models\Transactie;
-use App\Services\Evenementen\EvenementService;
 use Hidehalo\Nanoid\Client;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -17,9 +16,23 @@ class GroepService {
     public function __construct(
         protected Weergave $weergave,
         protected ToegangService $toegang,
-        protected EvenementService $evenementService,
         protected DeelnameService $deelname,
     ) {}
+
+    /**
+     * Stores which page I switched to in this evenement as my betaalbron: 'groep' sets my groep's id, 'persoonlijk'
+     * sets null. Not in a groep: always null. Returns the stored value.
+     */
+    public function kiesBetaalbron(Gebruiker $gebruiker, Evenement $evenement, string $soort): ?int {
+        $groepId = $soort === 'groep' ? $this->toegang->mijnGroep($gebruiker->id, $evenement->id)?->id : null;
+
+        DB::table('gebruiker_evenement')
+            ->where('gebruiker_id', $gebruiker->id)
+            ->where('evenement_id', $evenement->id)
+            ->update(['betaalbron' => $groepId, 'updated_at' => now()]);
+
+        return $groepId;
+    }
 
     /** My groep in this evenement with saldo, leden and aandelen, or null when I'm not in a groep. */
     public function groepDetail(Gebruiker $gebruiker, Evenement $evenement): ?array {
@@ -95,13 +108,13 @@ class GroepService {
     public function join(Gebruiker $gebruiker, string $code): Groep {
         $groep = Groep::with('evenement')->where('code', $code)->orderBy('id')->firstOrFail();
 
-        // Same rules as joining the evenement (ticket + started for evenementen with tickets). Checked outside the
+        // Same rules as joining the evenement (a scanned ticket for evenementen with tickets). Checked outside the
         // transaction, so the view it may remember for the tickets screen is kept.
         $this->deelname->controleer($gebruiker, $groep->evenement);
 
         DB::transaction(function () use ($gebruiker, $groep) {
-            // Throws when the evenement is gesloten or I'm blocked, otherwise makes me a deelnemer.
-            $this->evenementService->joinByCode($groep->evenement->code, $gebruiker->id);
+            // Makes me a deelnemer (if I'm not yet) and credits the munten of my tickets.
+            $this->deelname->deelnemen($gebruiker, $groep->evenement);
 
             // My groepen in this evenement.
             $mijnGroepIds = Groep::where('evenement_id', $groep->evenement_id)

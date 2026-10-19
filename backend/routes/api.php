@@ -46,6 +46,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/transacties', [EvenementController::class, 'transacties'])->name('evenementen.transacties');
         Route::get('/groep', [GroepController::class, 'show'])->name('evenementen.groep');
         Route::post('/groepen', [GroepController::class, 'store'])->name('evenementen.groepen.store');
+        Route::put('/betaalbron', [GroepController::class, 'betaalbron'])->name('evenementen.betaalbron');
         Route::get('/kaarten', [KaartController::class, 'evenement'])->name('evenementen.kaarten');
         Route::post('/kaarten/permanent', [KaartController::class, 'permanent'])->name('evenementen.kaarten.permanent');
         Route::post('/opwaarderen', [BetaalController::class, 'opwaarderen'])->name('evenementen.opwaarderen');
@@ -55,7 +56,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('/evenementen/{id}')->whereNumber('id')->middleware(EvenementZichtbaar::class)->group(function () {
         Route::get('/tickets', [TicketController::class, 'evenement'])->name('evenementen.tickets');
         Route::post('/deelnemen', [EvenementController::class, 'deelnemen'])->name('evenementen.deelnemen');
-        Route::post('/tickets/{ticket}/kopen', [BetaalController::class, 'ticketKopen'])->whereNumber('ticket')->name('evenementen.tickets.kopen');
+        Route::post('/tickets/kopen', [BetaalController::class, 'ticketsKopen'])->name('evenementen.tickets.kopen');
+        Route::get('/mijn-tickets', [TicketController::class, 'mijnTickets'])->name('evenementen.mijn-tickets');
+        Route::put('/mijn-tickets/{ticket}', [TicketController::class, 'teGeven'])->whereNumber('ticket')->name('evenementen.mijn-tickets.te-geven');
+        // Development only (config lagapay.dev_scan), otherwise 404.
+        Route::post('/mijn-tickets/{ticket}/dev-scan', [TicketController::class, 'devScan'])->whereNumber('ticket')->name('evenementen.mijn-tickets.dev-scan');
     });
 
     Route::post('/groepen/join', [GroepController::class, 'join'])->name('groepen.join');
@@ -63,6 +68,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/kaarten', [KaartController::class, 'index'])->name('kaarten.index');
 
     Route::get('/tickets', [TicketController::class, 'index'])->name('tickets.index');
+    Route::post('/tickets/scan', [TicketController::class, 'scan'])->name('tickets.scan');
+    Route::post('/ticket-uitnodigingen/{code}/accepteren', [TicketController::class, 'accepteer'])->name('ticket-uitnodigingen.accepteren');
 
     Route::put('/profiel', [ProfielController::class, 'update'])->name('profiel.update');
     Route::put('/profiel/wachtwoord', [ProfielController::class, 'wachtwoord'])->name('profiel.wachtwoord');

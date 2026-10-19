@@ -1,11 +1,10 @@
 // Screens 6 + 8: evenement Groep (Groep.dc.html when open, GroepGesloten.dc.html when gesloten).
 
-import { useState } from 'react';
-import { Platform, Pressable, Share, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { EvenementKop, GeenTerugstortNotitie, TerugstortKnop } from '@/components/evenement/onderdelen';
-import { UitnodigingQr } from '@/components/evenement/uitnodiging-qr';
+import { Uitnodigingslink } from '@/components/evenement/uitnodigingslink';
 import {
   Avatar,
   Button,
@@ -15,20 +14,16 @@ import {
   ErrorState,
   HeroButton,
   HeroCard,
-  Icon,
-  IconBox,
   ListRow,
   LoadingState,
   Screen,
   SectionLabel,
   Timeline,
-  kleuren,
 } from '@/components/lagapay';
 import { useApiData } from '@/hooks/use-api-data';
 import { getEvenementOverzicht, getGroep } from '@/lib/api/lagapay';
 import type { GroepDetail, GroepLid, Kaart, KaartStatus, Transactie } from '@/lib/api/types';
 import { formatMunten, formatTijd, maskUid } from '@/lib/format';
-import { meld } from '@/lib/melding';
 
 const KAART_STATUS: Record<KaartStatus, string> = {
   actief: 'Actief',
@@ -110,13 +105,17 @@ function GroepOpen({ evenementId, groep }: { evenementId: string; groep: GroepDe
         />
       </HeroCard>
 
-      <Uitnodigingslink link={groep.uitnodigingslink} groepNaam={groep.naam} />
+      <Uitnodigingslink
+        link={groep.uitnodigingslink}
+        titel={groep.naam}
+        omschrijving="Laat deze QR-code scannen in de LagaPay app om lid te worden van de groep."
+      />
 
       <ListRow
         icon="card"
-        title="Groepskaart"
+        title="Kaart"
         subtitle={kaartOmschrijving(groep.kaart)}
-        onPress={() => router.push(`/evenement/${evenementId}/kaarten-groep`)}
+        onPress={() => router.push(`/evenement/${evenementId}/koppelen?soort=groep`)}
       />
 
       {groep.leden.length > 0 ? (
@@ -194,70 +193,4 @@ function LedenLijst({ leden, metAandeel = false }: { leden: GroepLid[]; metAande
       ))}
     </Card>
   );
-}
-
-/** "lagapay.nl/g/rd48k2" row with a QR-code button and a Delen button. */
-function Uitnodigingslink({ link, groepNaam }: { link: string; groepNaam: string }) {
-  const [qrZichtbaar, setQrZichtbaar] = useState(false);
-
-  return (
-    <View className="flex-row items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900 px-3.5 py-3">
-      <IconBox icon="link" />
-      <View className="min-w-0 flex-1">
-        <Text className="text-[11px] font-semibold uppercase tracking-[0.8px] text-zinc-400">Uitnodigingslink</Text>
-        <Text selectable numberOfLines={1} className="mt-0.5 text-sm font-semibold text-purple-300">
-          {link.replace(/^https?:\/\//, '')}
-        </Text>
-      </View>
-      <Pressable
-        onPress={() => setQrZichtbaar(true)}
-        accessibilityRole="button"
-        accessibilityLabel="Toon QR-code"
-        hitSlop={6}
-        className="h-9 w-9 items-center justify-center rounded-xl border border-zinc-700 bg-zinc-800 active:opacity-80"
-      >
-        <Icon name="qr" size={18} color={kleuren.purple300} />
-      </Pressable>
-      <Button title="Delen" size="sm" onPress={() => void deelLink(link)} />
-      <UitnodigingQr
-        zichtbaar={qrZichtbaar}
-        groepNaam={groepNaam}
-        link={link}
-        onDelen={() => void deelLink(link)}
-        onSluiten={() => setQrZichtbaar(false)}
-      />
-    </View>
-  );
-}
-
-/**
- * Native: the system share sheet. Web: the browser's share sheet when it has one (navigator.share),
- * otherwise copy the link to the clipboard. Last resort: show the link so it can be copied by hand.
- */
-async function deelLink(link: string) {
-  if (Platform.OS !== 'web') {
-    try {
-      await Share.share({ message: link });
-    } catch {
-      meld('Uitnodigingslink', link);
-    }
-    return;
-  }
-
-  if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-    try {
-      await Share.share({ message: link });
-      return;
-    } catch (err) {
-      // The user closed the share sheet: nothing else to do.
-      if (err instanceof Error && err.name === 'AbortError') return;
-    }
-  }
-
-  try {
-    await navigator.clipboard.writeText(link);
-    meld('Link gekopieerd');
-  } catch {
-    meld('Uitnodigingslink', link);
-  }
 }

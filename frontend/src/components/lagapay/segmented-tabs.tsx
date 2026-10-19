@@ -1,6 +1,8 @@
 import { Platform, Pressable, Text, View } from 'react-native';
 import { router, type Href } from 'expo-router';
 
+import { kiesBetaalbron } from '@/lib/api/lagapay';
+
 // ---------------------------------------------------------------------------------------------
 // SegmentedTabs (generic)
 
@@ -62,13 +64,11 @@ export function PersoonlijkGroepTabs({ active, onSelect }: PersoonlijkGroepTabsP
 /**
  * Which pair of sibling routes the tabs switch between:
  * - 'overzicht': /evenement/[id] (persoonlijk) ⇄ /evenement/[id]/groep
- * - 'kaarten':   /evenement/[id]/kaarten (persoonlijk) ⇄ /evenement/[id]/kaarten-groep
  */
-export type EvenementTabPair = 'overzicht' | 'kaarten';
+export type EvenementTabPair = 'overzicht';
 
 const TAB_ROUTES = {
   overzicht: { persoonlijk: '/evenement/[id]', groep: '/evenement/[id]/groep' },
-  kaarten: { persoonlijk: '/evenement/[id]/kaarten', groep: '/evenement/[id]/kaarten-groep' },
 } as const;
 
 /**
@@ -77,24 +77,38 @@ const TAB_ROUTES = {
  */
 export const WISSEL_PARAM = 'wissel';
 
-/** Href of one side of a Persoonlijk|Groep pair, e.g. `evenementTabHref(5, 'kaarten', 'groep')`. */
+/** Href of one side of a Persoonlijk|Groep pair, e.g. `evenementTabHref(5, 'overzicht', 'groep')`. */
 export function evenementTabHref(evenementId: number | string, pair: EvenementTabPair, tab: PersoonlijkGroep): Href {
   return { pathname: TAB_ROUTES[pair][tab], params: { id: String(evenementId) } };
 }
 
+/** Persoonlijk|Groep picked per evenement in this app session; wins over the stored betaalbron (which saves in the background). */
+const gekozenTabs = new Map<string, PersoonlijkGroep>();
+
+/**
+ * Which page an evenement opens on: the side I picked in this session, otherwise Groep when my betaalbron is my
+ * groep (I switched to Groep last time), otherwise Persoonlijk.
+ */
+export function startTab(evenementId: number | string, betaalbron: number | null): PersoonlijkGroep {
+  return gekozenTabs.get(String(evenementId)) ?? (betaalbron !== null ? 'groep' : 'persoonlijk');
+}
+
 /**
  * Switches between the Persoonlijk and Groep page with `router.replace`, so back always returns
- * to the screen before the pair (the Evenementen list for 'overzicht', the evenement page for 'kaarten').
+ * to the screen before the pair (the Evenementen list).
+ * The chosen side is also stored as my betaalbron in this evenement (in the background; navigation doesn't wait).
  */
 export function wisselEvenementTab(evenementId: number | string, pair: EvenementTabPair, tab: PersoonlijkGroep) {
   const params: Record<string, string> = { id: String(evenementId) };
   if (Platform.OS !== 'web') params[WISSEL_PARAM] = '1';
   router.replace({ pathname: TAB_ROUTES[pair][tab], params } as Href);
+  gekozenTabs.set(String(evenementId), tab);
+  kiesBetaalbron(evenementId, tab).catch((err) => console.warn('Betaalbron opslaan lukt niet', err));
 }
 
 export interface EvenementTabsProps {
   evenementId: number | string;
-  /** 'overzicht' on index/groep, 'kaarten' on kaarten/kaarten-groep. */
+  /** 'overzicht' on index/groep. */
   pair: EvenementTabPair;
   /** The tab of the current screen. */
   active: PersoonlijkGroep;

@@ -4,11 +4,11 @@ namespace App\Services\Mobiel;
 
 use App\Models\Evenement;
 use App\Models\Gebruiker;
-use App\Models\Groep;
-use App\Models\Munt;
+use App\Models\GekochtTicket;
 use App\Models\Opwaardering;
 use App\Models\Ticket;
-use App\Models\Transactie;
+use App\Models\TicketUitnodiging;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -22,6 +22,8 @@ class BetaalService {
         protected ToegangService $toegang,
         protected EvenementOverzichtService $overzicht,
         protected GroepService $groepen,
+        protected PortemonneeService $portemonnee,
+        protected TicketMuntenService $ticketMunten,
     ) {}
 
     /**
@@ -53,19 +55,22 @@ class BetaalService {
                 'evenement_id' => $evenement->id,
             ]);
 
-            $this->boek($gebruiker, $evenement, $groep, 'opwaardering', $munten);
+            $this->portemonnee->boek($gebruiker, $evenement, $groep, 'opwaardering', $munten);
 
             return $groep ? $this->groepen->saldo($groep->id) : $this->overzicht->saldo($gebruiker->id, $evenement->id);
         });
     }
 
     /**
-     * Buys a ticket: links it to me and adds its included munten to my persoonlijk saldo.
+     * Buys several tickets in one go. $bestelling is [ticket id => ['aantal' => n, 'voor_vrienden' => m]]: m of the n
+     * tickets of that type are put on offer for friends (te_geven, taken through my uitnodigingslink) instead of
+     * being mine. Every ticket is its own row with its own QR code. The included munten go to the holder once
+     * they are a deelnemer, so none are credited for tickets on offer.
      *
      * @throws \DomainException test betalingen off, evenement gesloten or without tickets
-     * @throws TicketAlGekocht
+     * @throws ModelNotFoundException a ticket that isn't of this evenement
      */
-    public function koopTicket(Gebruiker $gebruiker, Evenement $evenement, Ticket $ticket): void {
+    public function koopTickets(Gebruiker $gebruiker, Evenement $evenement, array $bestelling): void {
         $this->testBetalingenAan();
 
         if (! $evenement->open) {
@@ -75,60 +80,36 @@ class BetaalService {
             throw new \DomainException('Dit evenement heeft geen tickets.');
         }
 
-        DB::transaction(function () use ($gebruiker, $evenement, $ticket) {
-            // Lock the ticket, so a double tap can't buy it twice.
-            Ticket::whereKey($ticket->id)->lockForUpdate()->first();
+        $tickets = Ticket::where('evenement_id', $evenement->id)->whereIn('id', array_keys($bestelling))->get()->keyBy('id');
 
-            $alGekocht = DB::table('gebruiker_ticket')
-                ->where('gebruiker_id', $gebruiker->id)
-                ->where('ticket_id', $ticket->id)
-                ->exists();
-
-            if ($alGekocht) {
-                throw new TicketAlGekocht('Je hebt dit ticket al.');
-            }
-
-            DB::table('gebruiker_ticket')->insert(['gebruiker_id' => $gebruiker->id, 'ticket_id' => $ticket->id]);
-
-            if ($ticket->munten > 0) {
-                $this->boek($gebruiker, $evenement, null, 'ticket', $ticket->munten);
-            }
-        });
-    }
-
-    /** A transactie plus the matching change of the wallet (persoonlijk, or the groep's when $groep is set). */
-    protected function boek(Gebruiker $gebruiker, Evenement $evenement, ?Groep $groep, string $type, int $munten): void {
-        $transactie = Transactie::create([
-            'gebruiker_id' => $gebruiker->id,
-            'evenement_id' => $evenement->id,
-            'groep_id'     => $groep?->id,
-            'hoeveelheid'  => $munten,
-            'type'         => $type,
-        ]);
-
-        // Saldo is the sum of the wallet's munten rows (see API.md); the change goes on one row per wallet:
-        // persoonlijk = my row without groep, groep = the groep's row without gebruiker.
-        $rij = Munt::query()
-            ->where('evenement_id', $evenement->id)
-            ->when(
-                $groep,
-                fn ($query) => $query->where('groep_id', $groep->id)->whereNull('gebruiker_id'),
-                fn ($query) => $query->where('gebruiker_id', $gebruiker->id)->whereNull('groep_id'),
-            )
-            ->lockForUpdate()
-            ->first();
-
-        if ($rij) {
-            $rij->update(['hoeveelheid' => $rij->hoeveelheid + $munten, 'laatste_transactie' => $transactie->id]);
-        } else {
-            Munt::create([
-                'gebruiker_id'       => $groep ? null : $gebruiker->id,
-                'evenement_id'       => $evenement->id,
-                'groep_id'           => $groep?->id,
-                'hoeveelheid'        => $munten,
-                'laatste_transactie' => $transactie->id,
-            ]);
+        if ($tickets->count() !== count($bestelling)) {
+            throw (new ModelNotFoundException())->setModel(Ticket::class);
         }
+
+        DB::transaction(function () use ($gebruiker, $evenement, $bestelling, $tickets) {
+            $voorVrienden = 0;
+
+            foreach ($bestelling as $ticketId => $regel) {
+                for ($i = 0; $i < $regel['aantal']; $i++) {
+                    GekochtTicket::create([
+                        'gebruiker_id' => $gebruiker->id,
+                        'ticket_id'    => $tickets[$ticketId]->id,
+                        'gekocht_door' => $gebruiker->id,
+                        'code'         => GekochtTicket::nieuweCode(),
+                        'te_geven'     => $i < $regel['voor_vrienden'],
+                    ]);
+                }
+
+                $voorVrienden += $regel['voor_vrienden'];
+            }
+
+            if ($voorVrienden > 0) {
+                TicketUitnodiging::voor($gebruiker->id, $evenement->id);
+            }
+
+            // Already a deelnemer: the tickets I keep pay out right away. Otherwise at joining.
+            $this->ticketMunten->uitkeren($gebruiker, $evenement);
+        });
     }
 
     /** munten × munt_prijs in euros, as a decimal string ("30.00"); calculated in cents. */

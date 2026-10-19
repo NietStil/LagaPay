@@ -1,5 +1,7 @@
 // Screens 5 + 7: evenement Persoonlijk (Overzicht.dc.html when open, OverzichtGesloten.dc.html when gesloten).
+// The evenement opens here; when I switched to the Groep page last time (betaalbron), it moves on to Groep.
 
+import { useEffect } from 'react';
 import { View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
@@ -14,6 +16,8 @@ import {
   Screen,
   SectionLabel,
   Timeline,
+  startTab,
+  wisselEvenementTab,
 } from '@/components/lagapay';
 import { useApiData } from '@/hooks/use-api-data';
 import { getEvenementOverzicht } from '@/lib/api/lagapay';
@@ -25,12 +29,17 @@ const dagTijdMeta = (t: Transactie) => formatDagTijd(t.datum);
 export default function EvenementOverzichtScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data, error, loading, refreshing, reload, refresh } = useApiData(() => getEvenementOverzicht(id), [id]);
+  const naarGroep = data !== null && startTab(id, data.betaalbron) === 'groep';
 
-  if (!data) {
+  useEffect(() => {
+    if (naarGroep) wisselEvenementTab(id, 'overzicht', 'groep');
+  }, [naarGroep, id]);
+
+  if (!data || naarGroep) {
     return (
       <Screen>
         <EvenementKop evenementId={id} actief="persoonlijk" />
-        {loading ? <LoadingState /> : <ErrorState message={error ?? ''} onRetry={reload} />}
+        {loading || naarGroep ? <LoadingState /> : <ErrorState message={error ?? ''} onRetry={reload} />}
       </Screen>
     );
   }
@@ -54,9 +63,9 @@ export default function EvenementOverzichtScreen() {
           {/* Betalen (NFC) is out of scope, so Kaarten is the only entry: a full-width row instead of a 2-column grid. */}
           <ListRow
             icon="card"
-            title="Kaarten"
+            title="Kaart"
             subtitle="Je kaart voor dit evenement"
-            onPress={() => router.push(`/evenement/${id}/kaarten`)}
+            onPress={() => router.push(`/evenement/${id}/koppelen?soort=persoonlijk`)}
           />
         </>
       ) : (

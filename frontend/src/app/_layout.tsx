@@ -3,6 +3,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { DarkTheme, ThemeProvider, Stack, router, usePathname, useSegments, type Href } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import "../global.css";
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
@@ -62,26 +63,32 @@ function RootLayoutNav() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
+        <StatusBar style="light" />
         <ActivityIndicator size="large" color={kleuren.purple300} />
       </View>
     );
   }
 
+  // The bottom safe area keeps the app (tab bar, footers) above the Android navigation bar and
+  // the iOS home indicator, so screens only handle the top inset themselves.
   return (
-    <ThemeProvider value={theme}>
-      <StatusBar style="light" />
-      <AnimatedSplashOverlay />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: kleuren.zinc950 } }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="login" options={{ animation: 'fade' }} />
-        <Stack.Screen name="register" options={{ animation: 'fade' }} />
-        <Stack.Screen name="toevoegen" />
-        <Stack.Screen name="evenement/[id]" />
-        <Stack.Screen name="wachtwoord" />
-        <Stack.Screen name="e/[code]" options={{ animation: 'fade' }} />
-        <Stack.Screen name="g/[code]" options={{ animation: 'fade' }} />
-      </Stack>
-    </ThemeProvider>
+    <SafeAreaView edges={['bottom']} style={styles.root}>
+      <ThemeProvider value={theme}>
+        <StatusBar style="light" />
+        <AnimatedSplashOverlay />
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: kleuren.zinc950 } }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="login" options={{ animation: 'fade' }} />
+          <Stack.Screen name="register" options={{ animation: 'fade' }} />
+          <Stack.Screen name="toevoegen" />
+          <Stack.Screen name="evenement/[id]" />
+          <Stack.Screen name="wachtwoord" />
+          <Stack.Screen name="e/[code]" options={{ animation: 'fade' }} />
+          <Stack.Screen name="g/[code]" options={{ animation: 'fade' }} />
+          <Stack.Screen name="t/[code]" options={{ animation: 'fade' }} />
+        </Stack>
+      </ThemeProvider>
+    </SafeAreaView>
   );
 }
 
@@ -94,6 +101,10 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: kleuren.zinc950,
+  },
   loadingContainer: {
     flex: 1,
     backgroundColor: kleuren.zinc950,

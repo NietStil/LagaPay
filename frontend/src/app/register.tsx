@@ -89,7 +89,7 @@ export default function RegisterScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <SafeAreaView className="w-full max-w-md mx-auto items-center my-auto">
+          <SafeAreaView edges={['top', 'left', 'right']} className="w-full max-w-md mx-auto items-center my-auto">
 
             {/* Brand Header */}
             <View className="items-center mb-8">

@@ -27,4 +27,17 @@ return [
 
     'test_betalingen' => (bool) env('LAGAPAY_TEST_BETALINGEN', env('APP_ENV') === 'local'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Dev scan
+    |--------------------------------------------------------------------------
+    |
+    | Lets the app scan your own ticket (the "Scan (dev)" button on Mijn
+    | tickets) as if at the entrance, so you can join an evenement with
+    | tickets without a scanner. Off unless APP_ENV=local.
+    |
+    */
+
+    'dev_scan' => (bool) env('LAGAPAY_DEV_SCAN', env('APP_ENV') === 'local'),
+
 ];

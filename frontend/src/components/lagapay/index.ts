@@ -54,6 +54,7 @@ export {
   PersoonlijkGroepTabs,
   SegmentedTabs,
   WISSEL_PARAM,
+  startTab,
   evenementTabHref,
   wisselEvenementTab,
   type EvenementTabPair,

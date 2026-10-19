@@ -5,6 +5,7 @@ import type {
   EvenementBasis,
   EvenementBekeken,
   EvenementKaarten,
+  EvenementMijnTickets,
   EvenementOverzicht,
   EvenementSamenvatting,
   EvenementTickets,
@@ -15,6 +16,8 @@ import type {
   MijnTickets,
   ProfielKaarten,
   ProfielUpdate,
+  TicketBestelregel,
+  TicketUitnodigingResultaat,
   Transactie,
   TransactieFilter,
   User,
@@ -72,6 +75,15 @@ export async function getGroep(evenementId: number | string): Promise<GroepDetai
 }
 
 /** Creates a groep in this evenement with me as its first lid; returns the new groep (same shape as getGroep). */
+/**
+ * Stores the page I switched to as my betaalbron in this evenement: 'groep' → my groep's id, 'persoonlijk' → null
+ * (also null when I'm not in a groep). Returns the stored value.
+ */
+export async function kiesBetaalbron(evenementId: number | string, soort: 'persoonlijk' | 'groep'): Promise<number | null> {
+  const res = await apiClient.put(`/evenementen/${evenementId}/betaalbron`, { soort });
+  return res.data.betaalbron;
+}
+
 export async function maakGroep(evenementId: number | string, naam: string): Promise<GroepDetail> {
   const res = await apiClient.post(`/evenementen/${evenementId}/groepen`, { naam });
   return res.data.groep;
@@ -110,9 +122,37 @@ export async function getEvenementTickets(evenementId: number | string): Promise
   return res.data;
 }
 
-/** Test betaling (no Mollie yet): the ticket is mine straight away. Returns the updated tickets screen data. */
-export async function koopTicket(evenementId: number | string, ticketId: number): Promise<EvenementTickets> {
-  const res = await apiClient.post(`/evenementen/${evenementId}/tickets/${ticketId}/kopen`);
+/** Test betaling (no Mollie yet): several tickets in one go, mine straight away. Returns the updated tickets screen data. */
+export async function koopTickets(evenementId: number | string, tickets: TicketBestelregel[]): Promise<EvenementTickets> {
+  const res = await apiClient.post(`/evenementen/${evenementId}/tickets/kopen`, { tickets });
+  return res.data;
+}
+
+/** Puts one of my tickets on offer for a friend (or takes it back). Returns the updated Mijn tickets data. */
+export async function zetTicketTeGeven(
+  evenementId: number | string,
+  ticketId: number,
+  teGeven: boolean,
+): Promise<EvenementMijnTickets> {
+  const res = await apiClient.put(`/evenementen/${evenementId}/mijn-tickets/${ticketId}`, { te_geven: teGeven });
+  return res.data;
+}
+
+/** Opening a friend's uitnodigingslink: takes one of their tickets (and joins the evenement when allowed). */
+export async function accepteerTicketUitnodiging(code: string): Promise<TicketUitnodigingResultaat> {
+  const res = await apiClient.post(`/ticket-uitnodigingen/${encodeURIComponent(code)}/accepteren`);
+  return res.data;
+}
+
+/** My bought tickets of this evenement, each with its QR code. */
+/** Development only (backend lagapay.dev_scan): scans one of my tickets as if at the entrance. */
+export async function devScanTicket(evenementId: number | string, ticketId: number): Promise<EvenementMijnTickets> {
+  const res = await apiClient.post(`/evenementen/${evenementId}/mijn-tickets/${ticketId}/dev-scan`);
+  return res.data;
+}
+
+export async function getMijnEvenementTickets(evenementId: number | string): Promise<EvenementMijnTickets> {
+  const res = await apiClient.get(`/evenementen/${evenementId}/mijn-tickets`);
   return res.data;
 }
 
