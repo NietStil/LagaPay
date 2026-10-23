@@ -39,8 +39,11 @@ Route::middleware('auth')->group(function () {
             Route::delete('/{id}', [EvenementController::class, 'destroy'])->name('destroy');
 
             Route::prefix('/{evenement_id}')->group(function () {
-                Route::put('/producten', [ProductenController::class, 'update'])->name('product.update');
-                Route::post('/producten', [ProductenController::class, 'create'])->name('product.store');
+                Route::post('/categorieen', [ProductenController::class, 'createCategorie'])->name('categorie.store');
+                Route::put('/categorieen/{id}', [ProductenController::class, 'updateCategorie'])->name('categorie.update');
+                Route::delete('/categorieen/{id}', [ProductenController::class, 'deleteCategorie'])->name('categorie.destroy');
+                Route::post('/categorieen/{categorie_id}/producten', [ProductenController::class, 'create'])->name('product.store');
+                Route::put('/producten/{id}', [ProductenController::class, 'update'])->name('product.update');
                 Route::delete('/producten/{id}', [ProductenController::class, 'delete'])->name('product.destroy');
 
                 Route::delete('/deelnemers/{gebruiker_id}', [DeelnemersController::class, 'delete'])->name('deelnemers.kick');

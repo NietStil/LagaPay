@@ -37,6 +37,7 @@ export interface Evenement {
     groepen?: Groep[];
     tickets?: Ticket[];
     producten?: Product[];
+    product_categorieen?: ProductCategorie[];
     kaarten?: Kaart[];
     deelnemers?: Gebruiker[];
 }
@@ -82,9 +83,16 @@ export interface Munt {
     laatste_transactie?: null | Transactie;
 }
 
+export interface ProductCategorie {
+    id: number;
+    naam: string;
+    evenement_id: number | Evenement;
+    producten?: Product[];
+}
+
 export interface Product {
     id: number;
-    evenement_id: number | Evenement;
+    categorie_id: number | ProductCategorie;
     prijs: number;
     naam: string;
 }

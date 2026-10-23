@@ -4,6 +4,7 @@ namespace App\Services\Evenementen;
 
 use App\Models\Evenement;
 use App\Models\Munt;
+use App\Models\Product;
 use App\Models\Transactie;
 use Hidehalo\Nanoid\Client;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +21,7 @@ class EvenementService {
                 'tickets' => function ($query) {
                     $query->withCount('gebruikers');
                 },
-                'producten',
+                'productCategorieen.producten',
                 'kaarten',
             ])
             ->findOrFail($id);
@@ -66,7 +67,8 @@ class EvenementService {
             DB::table('gebruiker_ticket')->whereIn('ticket_id', $ticketIds)->delete();
             $evenement->tickets()->delete();
 
-            $evenement->producten()->delete();
+            Product::whereIn('categorie_id', $evenement->productCategorieen()->select('id'))->delete();
+            $evenement->productCategorieen()->delete();
 
             // Kaarten belong to a gebruiker, so they are detached rather than deleted.
             $evenement->kaarten()->update(['evenement_id' => null]);

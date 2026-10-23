@@ -1,169 +1,131 @@
 import React, { useState, useEffect } from 'react';
 import { router, usePage } from '@inertiajs/react';
-import type { Evenement, Product } from '../../../types/type';
+import type { Evenement, Product, ProductCategorie } from '../../../types/type';
 
 interface SelectedEvenementProps {
     evenement: Evenement;
     setPage?: (e: any, page: any) => void;
 }
 
-interface MuntenChange {
-    id: number;
-    naam: string;
-    nieuwe_prijs: number;
-}
+// Blurring the input saves it, so Enter just leaves the input.
+const blurOnEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') e.currentTarget.blur();
+};
 
 export default function Producten({ evenement }: SelectedEvenementProps) {
     const { errors, flash } = usePage().props as any;
 
     const [searchQuery, setSearchQuery] = useState('');
-    const [showAddModal, setShowAddModal] = useState(false);
+    const [showCategorieModal, setShowCategorieModal] = useState(false);
+    const [productModalCategorie, setProductModalCategorie] = useState<ProductCategorie | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    const [muntWaarde] = useState<number>(Number(evenement.munt_prijs) || 1.50);
+    const muntWaarde = Number(evenement.munt_prijs) || 1.50;
+    const categorieen = evenement.product_categorieen || [];
+    const productenCount = categorieen.reduce((sum, c) => sum + (c.producten?.length || 0), 0);
 
-    const [productenList, setProductenList] = useState<Product[]>(
-        evenement.producten || []
-    );
-
-    const [muntenChanges, setMuntenChanges] = useState<MuntenChange[]>([]);
-
+    const [newCategorieNaam, setNewCategorieNaam] = useState('');
     const [newNaam, setNewNaam] = useState('');
     const [newMunten, setNewMunten] = useState<number>(1);
 
-    useEffect(() => {
-        setProductenList(evenement.producten || []);
-    }, [evenement.producten]);
+    const query = searchQuery.toLowerCase();
+    const filteredCategorieen = categorieen
+        .map((categorie) => {
+            const categorieMatch = categorie.naam.toLowerCase().includes(query);
+            const producten = categorieMatch
+                ? categorie.producten || []
+                : (categorie.producten || []).filter((p) => p.naam.toLowerCase().includes(query));
+            return { categorie, producten, zichtbaar: !query || categorieMatch || producten.length > 0 };
+        })
+        .filter((item) => item.zichtbaar);
 
-    const filteredProducten = productenList.filter((product: Product) =>
-        product.naam.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    const hasUnsavedChanges = muntenChanges.length > 0;
-
-    const handleMuntenChange = (id: number, val: number) => {
-        const parsed = isNaN(val) ? 0 : Math.max(0, val);
-        const product = productenList.find((p) => p.id === id);
-        const currentNaam = product ? product.naam : '';
-
-        setMuntenChanges((prev: MuntenChange[]) => {
-            const index = prev.findIndex((item: MuntenChange) => item.id === id);
-            if (index !== -1) {
-                const updated = [...prev];
-                updated[index] = { ...updated[index], nieuwe_prijs: parsed };
-                return updated;
-            }
-            return [...prev, { id, naam: currentNaam, nieuwe_prijs: parsed }];
-        });
+    const showStatus = (message: string) => {
+        setStatusMessage(message);
+        setTimeout(() => setStatusMessage(null), 3000);
     };
 
-    const handleNaamChange = (id: number, val: string) => {
-        setProductenList((prev: Product[]) =>
-            prev.map((p: Product) => (p.id === id ? { ...p, naam: val } : p))
-        );
-
-        setMuntenChanges((prev: any) => {
-            const index = prev.findIndex((item: any) => item.id === id);
-            if (index !== -1) {
-                const updated = [...prev];
-                updated[index] = { ...updated[index], naam: val };
-                return updated;
-            } else {
-                const product = productenList.find((p) => p.id === id);
-                return [
-                    ...prev,
-                    { id, naam: val, nieuwe_prijs: product ? product.prijs : 1 },
-                ];
-            }
-        });
-    };
-
-    const handleDeleteProduct = (e: React.MouseEvent, id: number) => {
-        e.preventDefault();
-
+    const request = (
+        method: 'post' | 'put' | 'delete',
+        url: string,
+        data: Record<string, any>,
+        succes: string | null,
+        fout: string,
+        onSuccess?: () => void,
+    ) => {
         setIsSaving(true);
-        setStatusMessage(null);
         setErrorMessage(null);
 
-        router.delete(`/dashboard/evenementen/${evenement.id}/producten/${id}`, {
+        const options = {
             preserveScroll: true,
+            preserveState: true,
             onSuccess: () => {
                 setIsSaving(false);
-                setStatusMessage('Product succesvol verwijderd!');
-                setTimeout(() => setStatusMessage(null), 3000);
+                if (succes) showStatus(succes);
+                onSuccess?.();
             },
             onError: () => {
                 setIsSaving(false);
-                setErrorMessage('Fout bij het verwijderen van product.');
-            }
+                setErrorMessage(fout);
+            },
+        };
+
+        const fullUrl = `/dashboard/evenementen/${evenement.id}${url}`;
+        if (method === 'delete') {
+            router.delete(fullUrl, options);
+        } else {
+            router[method](fullUrl, data, options);
+        }
+    };
+
+    const handleAddCategorie = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newCategorieNaam.trim()) return;
+
+        request('post', '/categorieen', { naam: newCategorieNaam.trim() }, 'Categorie succesvol toegevoegd!', 'Fout bij het toevoegen van categorie.', () => {
+            setNewCategorieNaam('');
+            setShowCategorieModal(false);
         });
+    };
+
+    const handleUpdateCategorie = (id: number, naam: string) => {
+        request('put', `/categorieen/${id}`, { naam }, null, 'Fout bij het opslaan van categorie.');
+    };
+
+    const handleDeleteCategorie = (categorie: ProductCategorie) => {
+        const aantal = categorie.producten?.length || 0;
+        if (aantal > 0 && !confirm(`Weet je zeker dat je "${categorie.naam}" wilt verwijderen? De ${aantal} ${aantal === 1 ? 'product' : 'producten'} in deze categorie worden ook verwijderd.`)) {
+            return;
+        }
+
+        request('delete', `/categorieen/${categorie.id}`, {}, 'Categorie succesvol verwijderd!', 'Fout bij het verwijderen van categorie.');
     };
 
     const handleAddProduct = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newNaam.trim()) return;
+        if (!productModalCategorie || !newNaam.trim()) return;
 
-        setIsSaving(true);
-        setStatusMessage(null);
-        setErrorMessage(null);
-
-        router.post(
-            `/dashboard/evenementen/${evenement.id}/producten`,
-            {
-                evenement_id: evenement.id,
-                naam: newNaam.trim(),
-                prijs: Math.max(0, newMunten),
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setNewNaam('');
-                    setNewMunten(1);
-                    setShowAddModal(false);
-                    setIsSaving(false);
-                    setStatusMessage('Product succesvol toegevoegd!');
-                    setTimeout(() => setStatusMessage(null), 3000);
-                },
-                onError: () => {
-                    setIsSaving(false);
-                    setErrorMessage('Fout bij het toevoegen van product.');
-                },
+        request(
+            'post',
+            `/categorieen/${productModalCategorie.id}/producten`,
+            { naam: newNaam.trim(), prijs: Math.max(0, newMunten) },
+            'Product succesvol toegevoegd!',
+            'Fout bij het toevoegen van product.',
+            () => {
+                setNewNaam('');
+                setNewMunten(1);
+                setProductModalCategorie(null);
             }
         );
     };
 
-    const handleSaveChanges = () => {
-        if (!hasUnsavedChanges) return;
+    const handleUpdateProduct = (id: number, velden: Partial<Pick<Product, 'naam' | 'prijs'>>) => {
+        request('put', `/producten/${id}`, velden, null, 'Fout bij het opslaan van product.');
+    };
 
-        setIsSaving(true);
-        setStatusMessage(null);
-        setErrorMessage(null);
-
-        const validUpdates = muntenChanges.filter((item) => item.id < 1000000000000);
-
-        router.put(
-            `/dashboard/evenementen/${evenement.id}/producten`,
-            {
-                update: validUpdates,
-                evenement_id: evenement.id,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setMuntenChanges([]);
-                    setIsSaving(false);
-                    setStatusMessage('Wijzigingen succesvol opgeslagen!');
-                    setTimeout(() => setStatusMessage(null), 3000);
-                },
-                onError: (err) => {
-                    console.log(err);
-                    setIsSaving(false);
-                    setErrorMessage('Er is een fout opgetreden bij het opslaan.');
-                },
-            }
-        );
+    const handleDeleteProduct = (id: number) => {
+        request('delete', `/producten/${id}`, {}, 'Product succesvol verwijderd!', 'Fout bij het verwijderen van product.');
     };
 
     return (
@@ -171,11 +133,11 @@ export default function Producten({ evenement }: SelectedEvenementProps) {
             <div className="max-w-7xl mx-auto space-y-6">
 
                 {/* Status / Error Notifications */}
-                {(statusMessage || flash?.success) && (
+                {statusMessage && (
                     <div className="bg-emerald-950 border border-emerald-800/80 text-emerald-200 px-4 py-3.5 rounded-2xl text-sm font-medium flex items-center justify-between shadow-xl">
                         <div className="flex items-center gap-2.5">
                             <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                            <span>{statusMessage || flash?.success}</span>
+                            <span>{statusMessage}</span>
                         </div>
                     </div>
                 )}
@@ -183,7 +145,7 @@ export default function Producten({ evenement }: SelectedEvenementProps) {
                     <div className="bg-red-950 border border-red-800/80 text-red-200 px-4 py-3.5 rounded-2xl text-sm font-medium flex items-center justify-between shadow-xl">
                         <div className="flex items-center gap-2.5">
                             <div className="w-2 h-2 rounded-full bg-red-400" />
-                            <span>{errorMessage || errors?.error}</span>
+                            <span>{errors?.error || errorMessage}</span>
                         </div>
                     </div>
                 )}
@@ -208,17 +170,8 @@ export default function Producten({ evenement }: SelectedEvenementProps) {
                         </div>
                     </div>
 
-                    {hasUnsavedChanges && (
-                        <button
-                            onClick={handleSaveChanges}
-                            disabled={isSaving}
-                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition-all shadow-lg shadow-emerald-950/60 disabled:opacity-50 active:scale-[0.98]"
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                            <span>{isSaving ? 'Bezig met opslaan...' : 'Wijzigingen Opslaan'}</span>
-                        </button>
+                    {isSaving && (
+                        <span className="text-xs font-semibold text-zinc-400">Bezig met opslaan...</span>
                     )}
                 </div>
 
@@ -231,7 +184,7 @@ export default function Producten({ evenement }: SelectedEvenementProps) {
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Zoek producten..."
+                            placeholder="Zoek producten of categorieën..."
                             className="w-full pl-10 pr-4 py-3 bg-zinc-950 border border-zinc-800 rounded-2xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
                         />
                         <svg className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3.5 transition-colors group-focus-within:text-purple-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -243,103 +196,117 @@ export default function Producten({ evenement }: SelectedEvenementProps) {
                     {/* Totaal Count & Add Button */}
                     <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
                         <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-                            Inventaris &bull; <span className="text-purple-400 font-bold">{productenList.length}</span> {productenList.length === 1 ? 'product' : 'producten'}
+                            Inventaris &bull; <span className="text-purple-400 font-bold">{categorieen.length}</span> {categorieen.length === 1 ? 'categorie' : 'categorieën'}
+                            {' '}&bull; <span className="text-purple-400 font-bold">{productenCount}</span> {productenCount === 1 ? 'product' : 'producten'}
                         </div>
 
                         <button
-                            onClick={() => setShowAddModal(true)}
+                            onClick={() => setShowCategorieModal(true)}
                             className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs transition-all shadow-md shadow-purple-950/50 active:scale-[0.98]"
-                            title="Nieuw product toevoegen"
+                            title="Nieuwe categorie toevoegen"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                             </svg>
-                            <span>Product toevoegen</span>
+                            <span>Categorie toevoegen</span>
                         </button>
                     </div>
 
-                    {/* Producten List */}
-                    <div className="max-h-[560px] overflow-y-auto divide-y divide-zinc-800/50 pr-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                        {filteredProducten.length === 0 ? (
+                    {/* Categorieen List */}
+                    <div className="max-h-[560px] overflow-y-auto space-y-4 pr-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                        {filteredCategorieen.length === 0 ? (
                             <div className="p-10 text-center bg-zinc-950 border border-zinc-800/80 rounded-2xl space-y-2 my-2">
                                 <p className="text-sm font-medium text-zinc-400">
                                     {searchQuery
                                         ? `Geen producten gevonden voor "${searchQuery}".`
-                                        : 'Nog geen producten toegevoegd.'}
+                                        : 'Nog geen categorieën toegevoegd.'}
                                 </p>
                             </div>
                         ) : (
-                            filteredProducten.map((product) => {
-                                const changeObj = muntenChanges.find((item) => item.id === product.id);
-                                const displayMunten = changeObj !== undefined ? changeObj.nieuwe_prijs : product.prijs;
-                                const berekendePrijs = (displayMunten * muntWaarde).toFixed(2);
-
-                                return (
-                                    <div
-                                        key={product.id}
-                                        className="group py-2.5 flex items-center justify-between gap-3 hover:bg-zinc-900/40 px-1.5 rounded-lg transition-all"
-                                    >
-                                        {/* Product Naam Input */}
-                                        <div className="flex-1 min-w-0">
-                                            <input
-                                                type="text"
-                                                value={product.naam}
-                                                onChange={(e) => handleNaamChange(product.id, e.target.value)}
-                                                className="w-full bg-transparent text-xs font-medium text-white focus:outline-none border-b border-transparent focus:border-purple-500 transition-colors py-0.5 px-1 rounded hover:bg-zinc-900/80"
-                                                placeholder="Productnaam..."
-                                            />
-                                        </div>
-
-                                        {/* Prijs Display */}
-                                        <div className="shrink-0 text-right px-1">
-                                            <span className="text-[10px] uppercase font-semibold text-zinc-500 block">Prijs</span>
-                                            <span className="text-xs font-bold text-emerald-400">
-                                                &euro; {berekendePrijs.replace('.', ',')}
-                                            </span>
-                                        </div>
-
-                                        {/* Munten Input */}
-                                        <div className={`shrink-0 flex items-center gap-1.5 bg-zinc-900/80 border ${changeObj !== undefined ? 'border-purple-500 bg-purple-950/40' : 'border-zinc-800'} px-2 py-1 rounded-lg transition-all`}>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                value={displayMunten}
-                                                onChange={(e) => handleMuntenChange(product.id, parseInt(e.target.value))}
-                                                className="w-10 bg-transparent text-center text-xs font-bold text-purple-300 focus:outline-none"
-                                            />
-                                            <span className="text-[10px] font-semibold text-zinc-400">munt</span>
-                                        </div>
-
-                                        {/* Delete Button */}
-                                        <button
-                                            onClick={(e) => handleDeleteProduct(e, product.id)}
-                                            className="shrink-0 text-zinc-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-500/10 transition-all opacity-80 group-hover:opacity-100"
-                                            title="Product verwijderen"
-                                        >
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                );
-                            })
+                            filteredCategorieen.map(({ categorie, producten }) => (
+                                <CategorieBlok
+                                    key={categorie.id}
+                                    categorie={categorie}
+                                    producten={producten}
+                                    muntWaarde={muntWaarde}
+                                    onRename={(naam) => handleUpdateCategorie(categorie.id, naam)}
+                                    onDelete={() => handleDeleteCategorie(categorie)}
+                                    onAddProduct={() => setProductModalCategorie(categorie)}
+                                    onUpdateProduct={handleUpdateProduct}
+                                    onDeleteProduct={handleDeleteProduct}
+                                />
+                            ))
                         )}
                     </div>
                 </div>
 
+                {/* Add Categorie Modal */}
+                {showCategorieModal && (
+                    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+                        <form onSubmit={handleAddCategorie} className="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-md p-6 space-y-5 shadow-2xl">
+
+                            <div className="flex items-center justify-between pb-3.5 border-b border-zinc-800">
+                                <div>
+                                    <span className="text-[10px] uppercase font-semibold text-purple-400 tracking-wider block">Catalogus</span>
+                                    <h3 className="text-base font-bold text-white">Nieuwe Categorie Toevoegen</h3>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCategorieModal(false)}
+                                    className="text-zinc-400 hover:text-white p-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 transition-colors"
+                                >
+                                    &times;
+                                </button>
+                            </div>
+
+                            <div className="space-y-1.5 text-sm">
+                                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                                    Categorienaam
+                                </label>
+                                <input
+                                    type="text"
+                                    value={newCategorieNaam}
+                                    onChange={(e) => setNewCategorieNaam(e.target.value)}
+                                    placeholder="Bijv. Bier / Fris / Eten"
+                                    required
+                                    autoFocus
+                                    className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-2xl text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-800">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCategorieModal(false)}
+                                    className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold text-xs transition-colors"
+                                >
+                                    Annuleren
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSaving}
+                                    className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs shadow-lg shadow-purple-950/50 disabled:opacity-50 transition-all active:scale-[0.98]"
+                                >
+                                    {isSaving ? 'Opslaan...' : 'Categorie toevoegen'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                )}
+
                 {/* Add Product Modal */}
-                {showAddModal && (
+                {productModalCategorie && (
                     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
                         <form onSubmit={handleAddProduct} className="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-md p-6 space-y-5 shadow-2xl">
 
                             <div className="flex items-center justify-between pb-3.5 border-b border-zinc-800">
                                 <div>
-                                    <span className="text-[10px] uppercase font-semibold text-purple-400 tracking-wider block">Catalogus</span>
+                                    <span className="text-[10px] uppercase font-semibold text-purple-400 tracking-wider block">{productModalCategorie.naam}</span>
                                     <h3 className="text-base font-bold text-white">Nieuw Product Toevoegen</h3>
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={() => setShowAddModal(false)}
+                                    onClick={() => setProductModalCategorie(null)}
                                     className="text-zinc-400 hover:text-white p-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 transition-colors"
                                 >
                                     &times;
@@ -357,6 +324,7 @@ export default function Producten({ evenement }: SelectedEvenementProps) {
                                         onChange={(e) => setNewNaam(e.target.value)}
                                         placeholder="Bijv. Speciaalbier / Wijn / Burger"
                                         required
+                                        autoFocus
                                         className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-2xl text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
                                     />
                                 </div>
@@ -379,7 +347,7 @@ export default function Producten({ evenement }: SelectedEvenementProps) {
                             <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-800">
                                 <button
                                     type="button"
-                                    onClick={() => setShowAddModal(false)}
+                                    onClick={() => setProductModalCategorie(null)}
                                     className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold text-xs transition-colors"
                                 >
                                     Annuleren
@@ -396,6 +364,184 @@ export default function Producten({ evenement }: SelectedEvenementProps) {
                     </div>
                 )}
             </div>
+        </div>
+    );
+}
+
+interface CategorieBlokProps {
+    categorie: ProductCategorie;
+    producten: Product[];
+    muntWaarde: number;
+    onRename: (naam: string) => void;
+    onDelete: () => void;
+    onAddProduct: () => void;
+    onUpdateProduct: (id: number, velden: Partial<Pick<Product, 'naam' | 'prijs'>>) => void;
+    onDeleteProduct: (id: number) => void;
+}
+
+function CategorieBlok({ categorie, producten, muntWaarde, onRename, onDelete, onAddProduct, onUpdateProduct, onDeleteProduct }: CategorieBlokProps) {
+    const [naam, setNaam] = useState(categorie.naam);
+
+    useEffect(() => {
+        setNaam(categorie.naam);
+    }, [categorie.naam]);
+
+    const handleBlur = () => {
+        const trimmed = naam.trim();
+        if (!trimmed) {
+            setNaam(categorie.naam);
+        } else if (trimmed !== categorie.naam) {
+            onRename(trimmed);
+        }
+    };
+
+    return (
+        <div className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-4 space-y-2">
+            {/* Categorie Header */}
+            <div className="flex items-center justify-between gap-3 pb-2 border-b border-zinc-800/80">
+                <input
+                    type="text"
+                    value={naam}
+                    onChange={(e) => setNaam(e.target.value)}
+                    onBlur={handleBlur}
+                    onKeyDown={blurOnEnter}
+                    className="flex-1 min-w-0 bg-transparent text-sm font-bold text-white focus:outline-none border-b border-transparent focus:border-purple-500 transition-colors py-0.5 px-1 rounded hover:bg-zinc-900/80"
+                    placeholder="Categorienaam..."
+                />
+
+                <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                    {categorie.producten?.length || 0} {(categorie.producten?.length || 0) === 1 ? 'product' : 'producten'}
+                </span>
+
+                <button
+                    onClick={onAddProduct}
+                    className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-purple-600 text-zinc-300 hover:text-white font-semibold text-[11px] transition-all"
+                    title="Product toevoegen aan deze categorie"
+                >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Product</span>
+                </button>
+
+                <button
+                    onClick={onDelete}
+                    className="shrink-0 text-zinc-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-500/10 transition-all"
+                    title="Categorie en producten verwijderen"
+                >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
+            </div>
+
+            {/* Producten List */}
+            {producten.length === 0 ? (
+                <p className="text-xs text-zinc-500 px-1 py-2">Nog geen producten in deze categorie.</p>
+            ) : (
+                <div className="divide-y divide-zinc-800/50">
+                    {producten.map((product) => (
+                        <ProductRij
+                            key={product.id}
+                            product={product}
+                            muntWaarde={muntWaarde}
+                            onUpdate={(velden) => onUpdateProduct(product.id, velden)}
+                            onDelete={() => onDeleteProduct(product.id)}
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+interface ProductRijProps {
+    product: Product;
+    muntWaarde: number;
+    onUpdate: (velden: Partial<Pick<Product, 'naam' | 'prijs'>>) => void;
+    onDelete: () => void;
+}
+
+function ProductRij({ product, muntWaarde, onUpdate, onDelete }: ProductRijProps) {
+    const [naam, setNaam] = useState(product.naam);
+    const [munten, setMunten] = useState(String(product.prijs));
+
+    useEffect(() => {
+        setNaam(product.naam);
+    }, [product.naam]);
+
+    useEffect(() => {
+        setMunten(String(product.prijs));
+    }, [product.prijs]);
+
+    const handleNaamBlur = () => {
+        const trimmed = naam.trim();
+        if (!trimmed) {
+            setNaam(product.naam);
+        } else if (trimmed !== product.naam) {
+            onUpdate({ naam: trimmed });
+        }
+    };
+
+    const handleMuntenBlur = () => {
+        const parsed = parseInt(munten);
+        if (isNaN(parsed) || parsed < 0) {
+            setMunten(String(product.prijs));
+        } else if (parsed !== product.prijs) {
+            onUpdate({ prijs: parsed });
+        }
+    };
+
+    const displayMunten = parseInt(munten);
+    const berekendePrijs = ((isNaN(displayMunten) ? product.prijs : displayMunten) * muntWaarde).toFixed(2);
+
+    return (
+        <div className="group py-2.5 flex items-center justify-between gap-3 hover:bg-zinc-900/40 px-1.5 rounded-lg transition-all">
+            {/* Product Naam Input */}
+            <div className="flex-1 min-w-0">
+                <input
+                    type="text"
+                    value={naam}
+                    onChange={(e) => setNaam(e.target.value)}
+                    onBlur={handleNaamBlur}
+                    onKeyDown={blurOnEnter}
+                    className="w-full bg-transparent text-xs font-medium text-white focus:outline-none border-b border-transparent focus:border-purple-500 transition-colors py-0.5 px-1 rounded hover:bg-zinc-900/80"
+                    placeholder="Productnaam..."
+                />
+            </div>
+
+            {/* Prijs Display */}
+            <div className="shrink-0 text-right px-1">
+                <span className="text-[10px] uppercase font-semibold text-zinc-500 block">Prijs</span>
+                <span className="text-xs font-bold text-emerald-400">
+                    &euro; {berekendePrijs.replace('.', ',')}
+                </span>
+            </div>
+
+            {/* Munten Input */}
+            <div className="shrink-0 flex items-center gap-1.5 bg-zinc-900/80 border border-zinc-800 focus-within:border-purple-500 px-2 py-1 rounded-lg transition-all">
+                <input
+                    type="number"
+                    min="0"
+                    value={munten}
+                    onChange={(e) => setMunten(e.target.value)}
+                    onBlur={handleMuntenBlur}
+                    onKeyDown={blurOnEnter}
+                    className="w-10 bg-transparent text-center text-xs font-bold text-purple-300 focus:outline-none"
+                />
+                <span className="text-[10px] font-semibold text-zinc-400">munt</span>
+            </div>
+
+            {/* Delete Button */}
+            <button
+                onClick={onDelete}
+                className="shrink-0 text-zinc-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-500/10 transition-all opacity-80 group-hover:opacity-100"
+                title="Product verwijderen"
+            >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+            </button>
         </div>
     );
 }

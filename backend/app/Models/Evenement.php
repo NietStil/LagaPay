@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Evenement extends Model
 {
@@ -58,9 +59,14 @@ class Evenement extends Model
         return $this->hasMany(Ticket::class, 'evenement_id');
     }
 
-    public function producten(): HasMany
+    public function productCategorieen(): HasMany
     {
-        return $this->hasMany(Product::class, 'evenement_id');
+        return $this->hasMany(ProductCategorie::class, 'evenement_id');
+    }
+
+    public function producten(): HasManyThrough
+    {
+        return $this->hasManyThrough(Product::class, ProductCategorie::class, 'evenement_id', 'categorie_id');
     }
 
     public function kaarten(): HasMany

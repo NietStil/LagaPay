@@ -15,7 +15,7 @@ class Product extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'evenement_id',
+        'categorie_id',
         'prijs',
         'naam',
     ];
@@ -27,8 +27,8 @@ class Product extends Model
         ];
     }
 
-    public function evenement(): BelongsTo
+    public function categorie(): BelongsTo
     {
-        return $this->belongsTo(Evenement::class, 'evenement_id');
+        return $this->belongsTo(ProductCategorie::class, 'categorie_id');
     }
 }

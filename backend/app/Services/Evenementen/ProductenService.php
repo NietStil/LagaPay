@@ -3,59 +3,76 @@
 namespace App\Services\Evenementen;
 
 use App\Models\Product;
+use App\Models\ProductCategorie;
 use InvalidArgumentException;
 use Illuminate\Support\Facades\DB;
 
 class ProductenService {
-    public function updateProducten(iterable $update, int|string $evenement_id): void
+    public function categorieToevoegen(int|string $evenement_id, string $naam): ProductCategorie
     {
-        DB::transaction(function () use ($update, $evenement_id) {
-            $valideerEvenement = function ($product, $id) use ($evenement_id) {
-                if ((int) $product->evenement_id !== (int) $evenement_id) {
-                    throw new InvalidArgumentException(
-                        "Product ID {$id} behoort niet tot evenement ID {$evenement_id}."
-                    );
-                }
-            };
-
-            if (is_iterable($update)) {
-                foreach ($update as $item) {
-                    $id = is_array($item) ? ($item['id'] ?? null) : ($item->id ?? null);
-                    if (!$id || !$product = Product::find($id)) {
-                        continue;
-                    }
-
-                    $valideerEvenement($product, $id);
-
-                    $product->update([
-                        'prijs' => is_array($item) ? ($item['nieuwe_prijs'] ?? $item['niewe_prijs'] ?? $product->prijs) : ($item->nieuwe_prijs ?? $item->niewe_prijs ?? $product->prijs),
-                        'naam'  => is_array($item) ? ($item['naam'] ?? $product->naam) : ($item->naam ?? $product->naam),
-                    ]);
-                }
-            }
-        });
-    }
-
-    public function productToevoegen($product) {
-        $evenementId = is_array($product) ? ($product['evenement_id'] ?? null) : ($product->evenement_id ?? null);
-        $prijs = is_array($product) ? ($product['prijs'] ?? $product['nieuwe_prijs'] ?? 0) : ($product->prijs ?? $product->nieuwe_prijs ?? 0);
-        $naam = is_array($product) ? ($product['naam'] ?? '') : ($product->naam ?? '');
-
-        return Product::create([
-            'evenement_id' => $evenementId,
-            'prijs'        => $prijs,
+        return ProductCategorie::create([
+            'evenement_id' => $evenement_id,
             'naam'         => $naam,
         ]);
     }
 
-    public function productVerwijderen($id): void
+    public function categorieBijwerken(int|string $evenement_id, int|string $id, string $naam): void
     {
-        $product = Product::findOrFail($id);
-        $product->delete();
+        $this->vindCategorie($evenement_id, $id)->update(['naam' => $naam]);
+    }
+
+    public function categorieVerwijderen(int|string $evenement_id, int|string $id): void
+    {
+        $categorie = $this->vindCategorie($evenement_id, $id);
+
+        DB::transaction(function () use ($categorie) {
+            $categorie->producten()->delete();
+            $categorie->delete();
+        });
+    }
+
+    public function productToevoegen(int|string $evenement_id, int|string $categorie_id, string $naam, int $prijs): Product
+    {
+        return $this->vindCategorie($evenement_id, $categorie_id)->producten()->create([
+            'naam'  => $naam,
+            'prijs' => $prijs,
+        ]);
+    }
+
+    public function productBijwerken(int|string $evenement_id, int|string $id, array $velden): void
+    {
+        $this->vindProduct($evenement_id, $id)->update($velden);
+    }
+
+    public function productVerwijderen(int|string $evenement_id, int|string $id): void
+    {
+        $this->vindProduct($evenement_id, $id)->delete();
+    }
+
+    private function vindCategorie(int|string $evenement_id, int|string $id): ProductCategorie
+    {
+        $categorie = ProductCategorie::findOrFail($id);
+
+        if ((int) $categorie->evenement_id !== (int) $evenement_id) {
+            throw new InvalidArgumentException("Categorie ID {$id} behoort niet tot evenement ID {$evenement_id}.");
+        }
+
+        return $categorie;
+    }
+
+    private function vindProduct(int|string $evenement_id, int|string $id): Product
+    {
+        $product = Product::with('categorie')->findOrFail($id);
+
+        if ((int) $product->categorie->evenement_id !== (int) $evenement_id) {
+            throw new InvalidArgumentException("Product ID {$id} behoort niet tot evenement ID {$evenement_id}.");
+        }
+
+        return $product;
     }
 
     public function getProductVerkoopPerUur($evenement_id) {
-        $producten = Product::where('evenement_id', $evenement_id)->get();
+        $producten = Product::whereRelation('categorie', 'evenement_id', $evenement_id)->get();
         $uren = ["10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"];
 
         $productData = $producten->map(function ($product) use ($uren, $evenement_id) {
