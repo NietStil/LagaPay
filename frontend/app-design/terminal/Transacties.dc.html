@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Bar terminal, transacties</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#d8b4fe}a:hover{color:#e9d5ff}
+@keyframes openUp{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.detail{animation:openUp .2s cubic-bezier(.2,.8,.2,1)}
+@media (prefers-reduced-motion:reduce){.detail{animation:none}}
+</style>
+</helmet>
+<div style="position:relative;width:390px;height:844px;overflow:hidden;box-sizing:border-box;background:#09090b;color:#fafafa;font-family:-apple-system,system-ui,'Segoe UI',sans-serif;display:flex;flex-direction:column">
+
+<div style="padding:56px 20px 0">
+<h1 style="margin:0;font-size:22px;font-weight:700;letter-spacing:-0.3px">Transacties</h1>
+</div>
+
+<div style="flex:1;min-height:0;padding:18px 20px 16px;display:flex;flex-direction:column">
+<div style="max-height:100%;overflow-y:auto;background:#18181b;border:1px solid #27272a;border-radius:20px">
+<sc-for list="{{transacties}}" as="t" hint-placeholder-count="7">
+<div style="border-top:{{t.sep}}">
+<button type="button" onClick="{{t.toggle}}" aria-expanded="{{t.expanded}}" style="width:100%;min-height:58px;display:flex;align-items:center;gap:12px;padding:8px 14px 8px 16px;box-sizing:border-box;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer">
+<span style="flex:1;min-width:0">
+<span style="display:block;font-size:15px;font-weight:600">{{t.naam}}</span>
+<span style="display:block;margin-top:2px;font-size:12px;color:#a1a1aa">{{t.tijd}}</span>
+</span>
+<sc-if value="{{t.refunded}}" hint-placeholder-val="{{ false }}">
+<span style="padding:3px 8px;border-radius:999px;background:#022c22;border:1px solid #065f46;color:#6ee7b7;font-size:11px;font-weight:600">Terugbetaald</span>
+<span style="font-size:15px;font-weight:700;color:#71717a;text-decoration:line-through">{{t.total}} munten</span>
+</sc-if>
+<sc-if value="{{t.active}}" hint-placeholder-val="{{ true }}">
+<span style="font-size:15px;font-weight:700;color:#fafafa">{{t.total}} munten</span>
+</sc-if>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;color:#71717a;transform:rotate({{t.chevRot}});transition:transform .2s"><path d="M6 9l6 6 6-6"></path></svg>
+</button>
+<sc-if value="{{t.open}}" hint-placeholder-val="{{ false }}">
+<div class="detail" style="padding:0 16px 14px;display:flex;flex-direction:column">
+<sc-for list="{{t.regels}}" as="r" hint-placeholder-count="2">
+<div style="display:flex;align-items:center;gap:12px;min-height:44px;border-top:1px solid #27272a">
+<span style="min-width:30px;height:26px;border-radius:8px;background:#09090b;border:1px solid #27272a;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#d4d4d8">{{r.qty}}×</span>
+<span style="flex:1;min-width:0;font-size:14px;font-weight:600">{{r.naam}}</span>
+<span style="font-size:14px;font-weight:700;color:#d4d4d8">{{r.sub}} munten</span>
+</div>
+</sc-for>
+<sc-if value="{{t.active}}" hint-placeholder-val="{{ true }}">
+<button type="button" onClick="{{t.refund}}" style="margin-top:8px;height:48px;border:1px solid #fb7185;border-radius:14px;background:transparent;color:#fda4af;font:inherit;font-size:15px;font-weight:700;cursor:pointer">Terugbetalen · {{t.total}} munten</button>
+</sc-if>
+<sc-if value="{{t.refunded}}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:8px;padding:12px 14px;border-radius:14px;background:#022c22;border:1px solid #065f46;color:#6ee7b7;font-size:14px;font-weight:600">{{t.total}} munten teruggestort naar {{t.naam}}</div>
+</sc-if>
+</div>
+</sc-if>
+</div>
+</sc-for>
+</div>
+</div>
+
+<nav aria-label="Hoofdmenu" style="height:82px;box-sizing:border-box;padding:8px 8px 22px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:#09090b;border-top:1px solid #27272a">
+<a href="Transacties.dc.html" aria-current="page" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#d8b4fe;font-size:11px;font-weight:600">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"></path><path d="M9 8h6M9 12h6"></path></svg>
+Transacties
+</a>
+<a href="Main.dc.html" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#a1a1aa;font-size:11px;font-weight:600">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"></rect><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"></rect><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"></rect><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"></rect></svg>
+Producten
+</a>
+<a href="Scan.dc.html" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#a1a1aa;font-size:11px;font-weight:600">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"></path><path d="M7 12h10"></path></svg>
+Scan
+</a>
+<a href="#" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#a1a1aa;font-size:11px;font-weight:600">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"></path><path d="M10 16l-4-4 4-4"></path><path d="M6 12h10"></path></svg>
+Verlaten
+</a>
+</nav>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+// Sample transactions; prices match the products on the terminal screens.
+const BAR_TRANSACTIES = [
+  { id: 't1', naam: 'Sanne de Vries', tijd: '21:42', regels: [['Pilsner Urquell', 2, 3], ['Aperol Spritz', 1, 5], ['Cola Zero', 1, 2]] },
+  { id: 't2', naam: 'Daan Jansen', tijd: '21:35', regels: [['Gin & Tonic', 2, 6]] },
+  { id: 't3', naam: 'Lotte Bakker', tijd: '21:28', regels: [['Spa Rood', 1, 2], ['Fanta', 1, 2]] },
+  { id: 't4', naam: 'Bram Visser', tijd: '21:14', regels: [['Speciaalbier', 3, 4]] },
+  { id: 't5', naam: 'Emma Smit', tijd: '20:58', regels: [['Espresso Martini', 1, 6], ['Huiswijn Wit', 1, 4]] },
+  { id: 't6', naam: 'Noah Mulder', tijd: '20:41', regels: [['Pilsner Urquell', 4, 3]] },
+  { id: 't7', naam: 'Julia Peters', tijd: '20:30', regels: [['Mojito Special', 1, 6], ['Ice Tea', 1, 2]] }
+];
+
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.state || {};
+    const openId = s.openId === undefined ? 't1' : s.openId;
+    const refunded = s.refunded || {};
+
+    const transacties = BAR_TRANSACTIES.map((t, i) => {
+      const regels = t.regels.map(([naam, qty, prijs]) => ({ naam, qty, sub: qty * prijs }));
+      const open = t.id === openId;
+      const isRefunded = !!refunded[t.id];
+      return {
+        naam: t.naam,
+        tijd: t.tijd,
+        sep: i === 0 ? '0' : '1px solid #27272a',
+        regels,
+        total: regels.reduce((a, r) => a + r.sub, 0),
+        open,
+        expanded: open ? 'true' : 'false',
+        chevRot: open ? '180deg' : '0deg',
+        refunded: isRefunded,
+        active: !isRefunded,
+        toggle: () => this.setState({ openId: open ? null : t.id }),
+        refund: () => this.setState({ refunded: { ...refunded, [t.id]: true } })
+      };
+    });
+
+    return { transacties };
+  }
+}
+</script>
+</body>
+</html>

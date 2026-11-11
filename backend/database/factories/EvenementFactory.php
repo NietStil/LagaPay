@@ -22,6 +22,7 @@ class EvenementFactory extends Factory
             'heeft_tickets' => true,
             'munt_prijs' => fake()->randomFloat(2, 1.50, 3.50),
             'code' => fake()->unique()->regexify('[A-Za-z0-9_-]{15}'),
+            'terminal_code' => fake()->unique()->regexify('[A-Za-z0-9_-]{15}'),
             'gebruiker' => Gebruiker::factory(),
         ];
     }

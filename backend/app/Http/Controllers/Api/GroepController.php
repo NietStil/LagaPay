@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\Mobiel\DeelnameGeweigerd;
-use App\Services\Mobiel\GroepConflictException;
+use App\Services\Mobiel\Exceptions\DeelnameGeweigerd;
+use App\Services\Mobiel\Exceptions\GroepConflictException;
 use App\Services\Mobiel\GroepService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;

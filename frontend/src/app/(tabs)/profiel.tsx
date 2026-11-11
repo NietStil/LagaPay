@@ -10,6 +10,7 @@ import {
   ErrorBanner,
   ErrorState,
   IconBox,
+  ListRow,
   Screen,
   SectionLabel,
   StatusPill,
@@ -156,7 +157,11 @@ export default function ProfielScreen() {
   };
 
   return (
-    <Screen gap={22} onRefresh={kaarten.loading ? undefined : kaarten.refresh} refreshing={kaarten.refreshing}>
+    <Screen
+      gap={22}
+      onRefresh={kaarten.loading ? undefined : kaarten.refresh}
+      refreshing={kaarten.refreshing}
+    >
       <TabTitle>Profiel</TabTitle>
 
       <View>
@@ -221,6 +226,20 @@ export default function ProfielScreen() {
         ) : (
           <KaartenLijst kaarten={kaarten.data} />
         )}
+      </View>
+
+      <View>
+        <SectionLabel>Terminal</SectionLabel>
+        <Card radius={20} className="overflow-hidden">
+          <ListRow
+            variant="inset"
+            icon="scan"
+            title="Terminal worden"
+            subtitle="Scan de terminalcode van een evenement"
+            onPress={() => router.push('/terminal')}
+            last
+          />
+        </Card>
       </View>
 
       <Button title="Uitloggen" variant="danger" onPress={() => void logUit()} loading={uitloggen} />

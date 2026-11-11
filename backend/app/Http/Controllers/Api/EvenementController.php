@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Evenement;
-use App\Services\Mobiel\DeelnameGeweigerd;
 use App\Services\Mobiel\DeelnameService;
 use App\Services\Mobiel\EvenementOverzichtService;
+use App\Services\Mobiel\Exceptions\DeelnameGeweigerd;
 use App\Services\Mobiel\Weergave;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;

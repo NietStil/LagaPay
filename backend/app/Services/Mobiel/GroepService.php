@@ -8,6 +8,8 @@ use App\Models\Groep;
 use App\Models\KaartKoppeling;
 use App\Models\Munt;
 use App\Models\Transactie;
+use App\Services\Mobiel\Exceptions\DeelnameGeweigerd;
+use App\Services\Mobiel\Exceptions\GroepConflictException;
 use Hidehalo\Nanoid\Client;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;

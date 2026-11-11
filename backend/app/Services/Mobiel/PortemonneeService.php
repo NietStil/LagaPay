@@ -10,15 +10,31 @@ use App\Models\Transactie;
 
 /** Books munten on a wallet (persoonlijk, or a groep's) together with the matching transactie. */
 class PortemonneeService {
-    /** A transactie plus the matching change of the wallet (persoonlijk, or the groep's when $groep is set). */
-    public function boek(Gebruiker $gebruiker, Evenement $evenement, ?Groep $groep, string $type, int $munten): void {
+    public function __construct(
+        protected Weergave $weergave,
+    ) {}
+
+    /**
+     * A transactie plus the matching change of the wallet (persoonlijk, or the groep's when $groep is set).
+     * $munten is positive; the type gives the direction (uitgave takes munten out, see Weergave::NEGATIEVE_TYPES).
+     */
+    public function boek(
+        Gebruiker $gebruiker,
+        Evenement $evenement,
+        ?Groep $groep,
+        string $type,
+        int $munten,
+        ?int $opwaarderingId = null,
+    ): Transactie {
         $transactie = Transactie::create([
-            'gebruiker_id' => $gebruiker->id,
-            'evenement_id' => $evenement->id,
-            'groep_id'     => $groep?->id,
-            'hoeveelheid'  => $munten,
-            'type'         => $type,
+            'gebruiker_id'    => $gebruiker->id,
+            'evenement_id'    => $evenement->id,
+            'groep_id'        => $groep?->id,
+            'opwaardering_id' => $opwaarderingId,
+            'hoeveelheid'     => $munten,
+            'type'            => $type,
         ]);
+        $munten = $this->weergave->bedrag($type, $munten);
 
         // Saldo is the sum of the wallet's munten rows (see API.md); the change goes on one row per wallet:
         // persoonlijk = my row without groep, groep = the groep's row without gebruiker.
@@ -43,5 +59,7 @@ class PortemonneeService {
                 'laatste_transactie' => $transactie->id,
             ]);
         }
+
+        return $transactie;
     }
 }

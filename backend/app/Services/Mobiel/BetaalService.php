@@ -46,7 +46,7 @@ class BetaalService {
         }
 
         return DB::transaction(function () use ($gebruiker, $evenement, $munten, $groep) {
-            Opwaardering::create([
+            $opwaardering = Opwaardering::create([
                 'mollie_id'    => 'test_' . Str::uuid(),
                 'status'       => 'paid',
                 'amount'       => $this->bedrag($evenement, $munten),
@@ -55,7 +55,7 @@ class BetaalService {
                 'evenement_id' => $evenement->id,
             ]);
 
-            $this->portemonnee->boek($gebruiker, $evenement, $groep, 'opwaardering', $munten);
+            $this->portemonnee->boek($gebruiker, $evenement, $groep, 'opwaardering', $munten, $opwaardering->id);
 
             return $groep ? $this->groepen->saldo($groep->id) : $this->overzicht->saldo($gebruiker->id, $evenement->id);
         });

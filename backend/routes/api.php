@@ -10,8 +10,10 @@ use App\Http\Controllers\Api\EvenementController;
 use App\Http\Controllers\Api\GroepController;
 use App\Http\Controllers\Api\KaartController;
 use App\Http\Controllers\Api\ProfielController;
+use App\Http\Controllers\Api\TerminalController;
 use App\Http\Controllers\Api\TicketController;
 use App\Http\Middleware\EvenementDeelnemer;
+use App\Http\Middleware\EvenementTerminal;
 use App\Http\Middleware\EvenementZichtbaar;
 
 /*
@@ -61,6 +63,20 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/mijn-tickets/{ticket}', [TicketController::class, 'teGeven'])->whereNumber('ticket')->name('evenementen.mijn-tickets.te-geven');
         // Development only (config lagapay.dev_scan), otherwise 404.
         Route::post('/mijn-tickets/{ticket}/dev-scan', [TicketController::class, 'devScan'])->whereNumber('ticket')->name('evenementen.mijn-tickets.dev-scan');
+    });
+
+    // Bar terminals: join with the evenement's terminal_code; the rest only while I'm its actieve terminal, otherwise 404.
+    Route::get('/terminals', [TerminalController::class, 'index'])->name('terminals.index');
+    Route::post('/terminals/koppelen', [TerminalController::class, 'koppelen'])->name('terminals.koppelen');
+
+    Route::prefix('/terminals/{id}')->whereNumber('id')->middleware(EvenementTerminal::class)->group(function () {
+        Route::get('/', [TerminalController::class, 'show'])->name('terminals.show');
+        Route::post('/verlaten', [TerminalController::class, 'verlaten'])->name('terminals.verlaten');
+        Route::post('/afrekenen', [TerminalController::class, 'afrekenen'])->name('terminals.afrekenen');
+        // Development only (config lagapay.dev_scan), otherwise 404.
+        Route::post('/dev-afrekenen', [TerminalController::class, 'devAfrekenen'])->name('terminals.dev-afrekenen');
+        Route::get('/transacties', [TerminalController::class, 'transacties'])->name('terminals.transacties');
+        Route::post('/tickets/scan', [TerminalController::class, 'scan'])->name('terminals.tickets.scan');
     });
 
     Route::post('/groepen/join', [GroepController::class, 'join'])->name('groepen.join');

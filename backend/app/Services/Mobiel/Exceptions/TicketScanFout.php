@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Mobiel;
+namespace App\Services\Mobiel\Exceptions;
 
 /** A refused ticket scan, with the HTTP status and (when known) the scanned ticket. */
 class TicketScanFout extends \RuntimeException {

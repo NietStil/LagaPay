@@ -5,11 +5,14 @@ namespace App\Services\Mobiel;
 use App\Models\Evenement;
 use App\Models\Gebruiker;
 use App\Models\GekochtTicket;
+use App\Models\Terminal;
+use App\Services\Mobiel\Exceptions\DeelnameGeweigerd;
+use App\Services\Mobiel\Exceptions\TicketScanFout;
 
 /**
  * Scanning a ticket QR code at the entrance: marks the ticket as used and makes its holder a deelnemer (for
  * evenementen with tickets that is the only way in; see DeelnameService). Only the organiser of the ticket's
- * evenement (or an admin) may scan. There is no scanner screen yet; this is the API a scanner calls.
+ * evenement, an admin or an actieve terminal of the evenement (Scan tab of the bar terminal) may scan.
  */
 class TicketScanService {
     public function __construct(
@@ -34,7 +37,9 @@ class TicketScanService {
 
         $evenement = $gekocht->ticket->evenement;
 
-        if ($scanner->rol !== 'admin' && (int) $evenement->gebruiker !== $scanner->id) {
+        $isTerminal = Terminal::where('evenement_id', $evenement->id)->where('user_id', $scanner->id)->where('actief', true)->exists();
+
+        if ($scanner->rol !== 'admin' && (int) $evenement->gebruiker !== $scanner->id && ! $isTerminal) {
             throw new TicketScanFout('Je mag tickets van dit evenement niet scannen.', 403);
         }
 

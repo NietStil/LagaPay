@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Mobiel;
+namespace App\Services\Mobiel\Exceptions;
 
 /** A refused ticket offer or uitnodiging, with the HTTP status and extra fields for the response body. */
 class TicketOverdrachtFout extends \RuntimeException {

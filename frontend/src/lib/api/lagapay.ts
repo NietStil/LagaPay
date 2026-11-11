@@ -2,6 +2,7 @@
 
 import apiClient from '@/lib/api/client';
 import type {
+  AfrekenResultaat,
   EvenementBasis,
   EvenementBekeken,
   EvenementKaarten,
@@ -10,12 +11,15 @@ import type {
   EvenementSamenvatting,
   EvenementTickets,
   GroepDetail,
+  GescandTicket,
   GroepJoinResultaat,
   KaartSoort,
   PersoonlijkOfGroep,
   MijnTickets,
   ProfielKaarten,
   ProfielUpdate,
+  TerminalOverzicht,
+  TerminalVerkoop,
   TicketBestelregel,
   TicketUitnodigingResultaat,
   Transactie,
@@ -164,6 +168,62 @@ export async function updateProfiel(data: ProfielUpdate): Promise<User> {
 export async function updateWachtwoord(data: WachtwoordUpdate): Promise<string> {
   const res = await apiClient.put('/profiel/wachtwoord', data);
   return res.data.message;
+}
+
+// Bar terminal ---------------------------------------------------------------------------------
+
+/** Evenementen where I'm an actieve terminal (to continue after closing the app). */
+export async function getTerminals(): Promise<EvenementBasis[]> {
+  const res = await apiClient.get('/terminals');
+  return res.data.terminals;
+}
+
+/** Becomes (again) the terminal of the evenement with this terminal code. */
+export async function koppelTerminal(code: string): Promise<EvenementBasis> {
+  const res = await apiClient.post('/terminals/koppelen', { code });
+  return res.data.evenement;
+}
+
+export async function getTerminal(evenementId: number | string): Promise<TerminalOverzicht> {
+  const res = await apiClient.get(`/terminals/${evenementId}`);
+  return res.data;
+}
+
+export async function verlaatTerminal(evenementId: number | string): Promise<void> {
+  await apiClient.post(`/terminals/${evenementId}/verlaten`);
+}
+
+/** Takes the bestelling's munten from the wallet of the scanned kaart. */
+export async function afrekenen(
+  evenementId: number | string,
+  kaartUid: string,
+  producten: { id: number; aantal: number }[],
+): Promise<AfrekenResultaat> {
+  const res = await apiClient.post(`/terminals/${evenementId}/afrekenen`, { kaart_uid: kaartUid, producten });
+  return res.data;
+}
+
+/**
+ * Development only (backend lagapay.dev_scan): afrekenen as if a random wristband of this evenement was scanned.
+ * The saldo isn't checked, so the sale is always booked.
+ */
+export async function devAfrekenen(
+  evenementId: number | string,
+  producten: { id: number; aantal: number }[],
+): Promise<AfrekenResultaat> {
+  const res = await apiClient.post(`/terminals/${evenementId}/dev-afrekenen`, { producten });
+  return res.data;
+}
+
+export async function getTerminalTransacties(evenementId: number | string): Promise<TerminalVerkoop[]> {
+  const res = await apiClient.get(`/terminals/${evenementId}/transacties`);
+  return res.data.transacties;
+}
+
+/** Scan tab: a ticket QR code of this evenement, scanned at the entrance. */
+export async function scanTicketBijTerminal(evenementId: number | string, code: string): Promise<GescandTicket> {
+  const res = await apiClient.post(`/terminals/${evenementId}/tickets/scan`, { code });
+  return res.data.ticket;
 }
 
 /**

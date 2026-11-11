@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { router } from '@inertiajs/react';
+import DeelnameLink from '../../../Components/Evenementen/DeelnameLink';
 import type { Evenement } from '../../../types/type';
 
 interface SelectedEvenementProps {
@@ -7,9 +8,12 @@ interface SelectedEvenementProps {
     deelnemers: any;
     setPage?: (page: any) => void;
     transacties: any;
+    /** 'terminals': the Terminals tab (same table and options, plus the terminal code and a Status column). */
+    soort?: 'deelnemers' | 'terminals';
 }
 
-export default function Deelnemers({ evenement, deelnemers, transacties }: SelectedEvenementProps) {
+export default function Deelnemers({ evenement, deelnemers, transacties, soort = 'deelnemers' }: SelectedEvenementProps) {
+    const terminals = soort === 'terminals';
     const getInitialSearch = () => {
         if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search);
@@ -50,7 +54,7 @@ export default function Deelnemers({ evenement, deelnemers, transacties }: Selec
 
         router.get(
             `/dashboard/evenementen/${evenement.id}`,
-            { tab: 'deelnemers', search: val },
+            { tab: soort, search: val },
             { preserveState: true, replace: true, preserveScroll: true }
         );
     };
@@ -107,14 +111,16 @@ export default function Deelnemers({ evenement, deelnemers, transacties }: Selec
                             </svg>
                         </button>
                         <h1 className="text-2xl font-extrabold text-white tracking-tight">
-                            Deelnemers &mdash; <span className="text-purple-400">{evenement.naam}</span>
+                            {terminals ? 'Terminals' : 'Deelnemers'} &mdash; <span className="text-purple-400">{evenement.naam}</span>
                         </h1>
                     </div>
 
                     <div className="text-sm font-semibold text-zinc-400">
-                        Totaal: <span className="text-purple-400 font-bold">{totalDeelnemersCount}</span> deelnemers
+                        Totaal: <span className="text-purple-400 font-bold">{totalDeelnemersCount}</span> {terminals ? 'terminals' : 'deelnemers'}
                     </div>
                 </div>
+
+                {terminals && <DeelnameLink evenement={evenement} soort="terminal" />}
 
                 {/* Search Bar */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-zinc-900 border border-zinc-800 p-4 rounded-2xl">
@@ -123,7 +129,7 @@ export default function Deelnemers({ evenement, deelnemers, transacties }: Selec
                             type="text"
                             value={searchQuery}
                             onChange={handleSearchChange}
-                            placeholder="Zoek deelnemer op naam of e-mail..."
+                            placeholder={terminals ? 'Zoek terminal op naam of e-mail...' : 'Zoek deelnemer op naam of e-mail...'}
                             className="w-full pl-9 pr-4 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-purple-500 transition-colors"
                         />
                         <svg className="w-4 h-4 text-zinc-500 absolute left-3 top-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -141,11 +147,13 @@ export default function Deelnemers({ evenement, deelnemers, transacties }: Selec
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                             </svg>
                         </div>
-                        <h3 className="text-lg font-bold text-white">Geen deelnemers gevonden</h3>
+                        <h3 className="text-lg font-bold text-white">{terminals ? 'Geen terminals gevonden' : 'Geen deelnemers gevonden'}</h3>
                         <p className="text-sm text-zinc-400 max-w-md mx-auto">
                             {searchQuery
-                                ? `Er zijn geen deelnemers die overeenkomen met "${searchQuery}".`
-                                : 'Er zijn momenteel geen geregistreerde deelnemers gekoppeld aan dit evenement.'}
+                                ? `Er zijn geen ${terminals ? 'terminals' : 'deelnemers'} die overeenkomen met "${searchQuery}".`
+                                : terminals
+                                    ? 'Er heeft zich nog geen toestel als terminal aangemeld. Scan de terminal-QR-code hierboven in de LagaPay app.'
+                                    : 'Er zijn momenteel geen geregistreerde deelnemers gekoppeld aan dit evenement.'}
                         </p>
                     </div>
                 ) : (
@@ -154,9 +162,9 @@ export default function Deelnemers({ evenement, deelnemers, transacties }: Selec
                             <table className="w-full text-left text-sm">
                                 <thead className="bg-zinc-950 text-zinc-400 text-xs uppercase font-semibold border-b border-zinc-800">
                                     <tr>
-                                        <th className="px-6 py-4">Deelnemer</th>
+                                        <th className="px-6 py-4">{terminals ? 'Terminal' : 'Deelnemer'}</th>
                                         <th className="px-6 py-4">E-mail</th>
-                                        <th className="px-6 py-4">Ticket</th>
+                                        <th className="px-6 py-4">{terminals ? 'Status' : 'Ticket'}</th>
                                         <th className="px-6 py-4">Groep(en)</th>
                                         <th className="px-6 py-4">NFC Kaart</th>
                                         <th className="px-6 py-4 text-right">Saldo</th>
@@ -202,7 +210,7 @@ export default function Deelnemers({ evenement, deelnemers, transacties }: Selec
                                                         {gebruiker.email}
                                                     </td>
                                                     <td className="px-6 py-4 text-xs font-medium text-purple-300">
-                                                        {gebruiker.ticket_naam || '-'}
+                                                        {terminals ? <TerminalStatus actief={!!gebruiker.actief} /> : (gebruiker.ticket_naam || '-')}
                                                     </td>
                                                     <td className="px-6 py-4 text-xs">
                                                         {gebruiker.groepen_namen ? (
@@ -302,7 +310,7 @@ export default function Deelnemers({ evenement, deelnemers, transacties }: Selec
                                                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                                                                     <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                                                                 </svg>
-                                                                                Deelnemer Details
+                                                                                {terminals ? 'Terminal Details' : 'Deelnemer Details'}
                                                                             </h4>
                                                                         </div>
 
@@ -315,6 +323,12 @@ export default function Deelnemers({ evenement, deelnemers, transacties }: Selec
                                                                                 <span className="text-xs font-semibold text-zinc-400">E-mailadres</span>
                                                                                 <span className="text-xs font-medium text-white">{gebruiker.email}</span>
                                                                             </div>
+                                                                            {terminals && (
+                                                                                <div className="py-2 flex items-center justify-between gap-2">
+                                                                                    <span className="text-xs font-semibold text-zinc-400">Terminal</span>
+                                                                                    <TerminalStatus actief={!!gebruiker.actief} />
+                                                                                </div>
+                                                                            )}
                                                                             <div className="py-2 flex items-center justify-between gap-2">
                                                                                 <span className="text-xs font-semibold text-zinc-400">Ticket</span>
                                                                                 <span className="text-xs font-medium text-purple-300">{gebruiker.ticket_naam || '-'}</span>
@@ -439,5 +453,18 @@ export default function Deelnemers({ evenement, deelnemers, transacties }: Selec
                 )}
             </div>
         </div>
+    );
+}
+
+/** Actief: this device is the terminal now. Inactief: it left (Verlaten) or the gebruiker was blocked. */
+function TerminalStatus({ actief }: { actief: boolean }) {
+    return actief ? (
+        <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800/50 text-[10px] font-semibold">
+            Actief
+        </span>
+    ) : (
+        <span className="px-2 py-0.5 rounded bg-zinc-950 text-zinc-400 border border-zinc-800 text-[10px] font-semibold">
+            Inactief
+        </span>
     );
 }

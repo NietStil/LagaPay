@@ -65,6 +65,14 @@ class EvenementController extends Controller {
             ? $this->transactieService->evenementGebruikerTransacties($id, $deelnemers)
             : null;
 
+        $terminals = $tab === 'terminals'
+            ? $this->deelnemersService->getTerminals($id, $request)
+            : null;
+
+        $terminal_transacties = $tab === 'terminals'
+            ? $this->transactieService->evenementGebruikerTransacties($id, $terminals)
+            : null;
+
         $producten_verkoop = ($tab === 'evenement' || $tab === 'producten')
             ? $this->productService->getProductVerkoopPerUur($evenement->id)
             : null;
@@ -74,6 +82,8 @@ class EvenementController extends Controller {
             'groepen'    => $groepen,
             'deelnemers' => $deelnemers,
             'deelnemer_transacties' => $deelnemer_transacties,
+            'terminals'  => $terminals,
+            'terminal_transacties' => $terminal_transacties,
             'groep_transacties' => $groep_transacties,
             'producten_verkoop' => $producten_verkoop,
         ]);

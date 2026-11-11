@@ -243,4 +243,50 @@ export interface WachtwoordUpdate {
   wachtwoord_confirmation: string;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Bar terminal (/terminals/*)
+
+export interface TerminalProduct {
+  id: number;
+  naam: string;
+  /** Price in munten. */
+  prijs: number;
+  categorie_id: number;
+}
+
+/** GET /terminals/{id}: the evenement, its product categorieën (the tabs) and its producten. */
+export interface TerminalOverzicht {
+  evenement: EvenementBasis;
+  categorieen: { id: number; naam: string }[];
+  producten: TerminalProduct[];
+}
+
+/** One sale at a terminal (a transactie of type uitgave with its producten). */
+export interface TerminalVerkoop {
+  id: number;
+  /** Who paid (owner of the scanned kaart). */
+  naam: string;
+  /** Set when paid from a groep's saldo. */
+  groep: { id: number; naam: string } | null;
+  totaal: number;
+  datum: string;
+  producten: { naam: string; aantal: number; prijs: number | null }[];
+}
+
+export interface AfrekenResultaat {
+  transactie: TerminalVerkoop;
+  /** Saldo left on the wallet that paid. */
+  saldo: number;
+}
+
+export interface GescandTicket {
+  id: number;
+  naam: string;
+  evenement: { id: number; naam: string };
+  /** Naam of the buyer. */
+  eigenaar: string;
+  gebruikt: boolean;
+  gebruikt_op: string | null;
+}
+
 export type { User };

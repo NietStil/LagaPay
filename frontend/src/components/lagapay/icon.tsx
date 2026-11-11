@@ -128,6 +128,29 @@ const ICONS = {
     strokeWidth: 2,
     node: <Path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />,
   },
+
+  // Bar terminal tab bar (app-design/terminal/*.dc.html).
+  /** Receipt (Transacties). */
+  bon: { strokeWidth: 2, node: <Path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6" /> },
+  /** 2x2 grid (Producten). */
+  raster: {
+    strokeWidth: 2,
+    node: (
+      <>
+        <Rect x="4" y="4" width="6.5" height="6.5" rx="1.5" />
+        <Rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" />
+        <Rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" />
+        <Rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" />
+      </>
+    ),
+  },
+  /** Scan corners with a line (Scan). */
+  'scan-lijn': {
+    strokeWidth: 2,
+    node: <Path d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3M7 12h10" />,
+  },
+  /** Door with arrow in (Verlaten). */
+  verlaten: { strokeWidth: 2, node: <Path d="M14 4h4a2 2 0 012 2v12a2 2 0 01-2 2h-4M10 16l-4-4 4-4M6 12h10" /> },
 } satisfies Record<string, IconDef>;
 
 export type IconName = keyof typeof ICONS;

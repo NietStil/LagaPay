@@ -14,10 +14,12 @@ interface EvenementenLayoutProps {
     deelnemers?: any;
     groep_transacties: any;
     deelnemer_transacties: any;
+    terminals?: any;
+    terminal_transacties?: any;
     producten_verkoop?: any;
 }
 
-export default function EvenementenLayout({ evenement, groepen, deelnemers, groep_transacties, deelnemer_transacties, producten_verkoop }: EvenementenLayoutProps) {
+export default function EvenementenLayout({ evenement, groepen, deelnemers, groep_transacties, deelnemer_transacties, terminals, terminal_transacties, producten_verkoop }: EvenementenLayoutProps) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     // Initial tab read from URL query param `?tab=...`
@@ -65,6 +67,16 @@ export default function EvenementenLayout({ evenement, groepen, deelnemers, groe
             component: <Deelnemers evenement={evenement}
                 deelnemers={deelnemers}
                 transacties={deelnemer_transacties}
+            />,
+        },
+        {
+            id: 'terminals',
+            label: 'Terminals',
+            // Same table and options as Deelnemers, for the devices registered as bar terminal.
+            component: <Deelnemers evenement={evenement}
+                deelnemers={terminals}
+                transacties={terminal_transacties}
+                soort="terminals"
             />,
         },
         ...(evenement.heeft_tickets

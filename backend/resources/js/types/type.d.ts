@@ -28,6 +28,8 @@ export interface Evenement {
     heeft_tickets: boolean;
     munt_prijs: number;
     code: string | null;
+    /** Code (15 characters) that makes a device the bar terminal of this evenement: {link_url}/k/{terminal_code}. */
+    terminal_code: string | null;
     groepen_count?: number;
     tickets_count?: number;
     producten_count?: number;

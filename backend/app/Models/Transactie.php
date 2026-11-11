@@ -19,6 +19,7 @@ class Transactie extends Model
         'gebruiker_id',
         'evenement_id',
         'groep_id',
+        'opwaardering_id',
         'hoeveelheid',
         'type',
         'created_at',
@@ -45,6 +46,17 @@ class Transactie extends Model
     public function groep(): BelongsTo
     {
         return $this->belongsTo(Groep::class, 'groep_id');
+    }
+
+    public function opwaardering(): BelongsTo
+    {
+        return $this->belongsTo(Opwaardering::class, 'opwaardering_id');
+    }
+
+    /** Product lines of a terminal sale. */
+    public function producten(): HasMany
+    {
+        return $this->hasMany(TransactieProduct::class, 'transactie');
     }
 
     public function munten(): HasMany

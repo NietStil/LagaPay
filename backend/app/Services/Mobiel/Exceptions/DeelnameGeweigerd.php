@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Mobiel;
+namespace App\Services\Mobiel\Exceptions;
 
 /**
  * The gebruiker may not become deelnemer of the evenement (yet). Answered with 403 and a `reden`, so the app

@@ -5,6 +5,7 @@ namespace App\Services\Mobiel;
 use App\Models\Evenement;
 use App\Models\Gebruiker;
 use App\Services\Evenementen\EvenementService;
+use App\Services\Mobiel\Exceptions\DeelnameGeweigerd;
 use Illuminate\Support\Facades\DB;
 
 /**

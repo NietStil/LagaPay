@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\Mobiel\DeelnameGeweigerd;
-use App\Services\Mobiel\TicketOverdrachtFout;
+use App\Services\Mobiel\Exceptions\DeelnameGeweigerd;
+use App\Services\Mobiel\Exceptions\TicketOverdrachtFout;
+use App\Services\Mobiel\Exceptions\TicketScanFout;
 use App\Services\Mobiel\TicketOverdrachtService;
 use App\Services\Mobiel\TicketOverzichtService;
-use App\Services\Mobiel\TicketScanFout;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use App\Services\Mobiel\TicketScanService;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

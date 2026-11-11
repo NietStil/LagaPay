@@ -6,6 +6,8 @@ use App\Models\Evenement;
 use App\Models\Gebruiker;
 use App\Models\GekochtTicket;
 use App\Models\TicketUitnodiging;
+use App\Services\Mobiel\Exceptions\DeelnameGeweigerd;
+use App\Services\Mobiel\Exceptions\TicketOverdrachtFout;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 

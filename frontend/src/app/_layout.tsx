@@ -10,6 +10,7 @@ import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { kleuren } from '@/components/lagapay/kleuren';
 import { AuthProvider, useAuth } from '@/context/auth-context';
 import { isPendingLinkPad, setPendingLink, takePendingLink } from '@/lib/pending-link';
+import { laadActieveTerminal, useActieveTerminal, zetActieveTerminal } from '@/lib/terminal';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -31,6 +32,7 @@ function RootLayoutNav() {
   const segments = useSegments();
   const pathname = usePathname();
   const doorsturenRef = useRef(false);
+  const terminal = useActieveTerminal();
 
   // Auth guard. This is the only place that navigates after login/registration:
   // login.tsx and register.tsx just update the auth state.
@@ -60,7 +62,25 @@ function RootLayoutNav() {
     }
   }, [isAuthenticated, isLoading, segments, pathname]);
 
-  if (isLoading) {
+  // Bar terminal lock: after login (or at app start) check whether this account is an actieve terminal. While it is,
+  // every other screen leads back into the terminal; only "Verlaten" or a closed evenement ends it.
+  useEffect(() => {
+    if (isLoading) return;
+    if (!isAuthenticated) {
+      zetActieveTerminal(undefined);
+    } else if (terminal === undefined) {
+      void laadActieveTerminal();
+    }
+  }, [isAuthenticated, isLoading, terminal]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !terminal || segments[0] === 'terminal') return;
+    if (router.canDismiss()) router.dismissAll();
+    router.replace(`/terminal/${terminal}`);
+  }, [isAuthenticated, terminal, segments]);
+
+  // Also wait for the terminal check, so the normal app doesn't flash before the terminal opens.
+  if (isLoading || (isAuthenticated && terminal === undefined)) {
     return (
       <View style={styles.loadingContainer}>
         <StatusBar style="light" />
@@ -86,6 +106,10 @@ function RootLayoutNav() {
           <Stack.Screen name="e/[code]" options={{ animation: 'fade' }} />
           <Stack.Screen name="g/[code]" options={{ animation: 'fade' }} />
           <Stack.Screen name="t/[code]" options={{ animation: 'fade' }} />
+          <Stack.Screen name="k/[code]" options={{ animation: 'fade' }} />
+          <Stack.Screen name="terminal/index" />
+          {/* The bar terminal: no swipe back, it is left with "Verlaten". */}
+          <Stack.Screen name="terminal/[id]" options={{ gestureEnabled: false }} />
         </Stack>
       </ThemeProvider>
     </SafeAreaView>

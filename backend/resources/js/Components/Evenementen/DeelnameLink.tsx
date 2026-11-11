@@ -5,6 +5,8 @@ import type { Evenement } from '../../types/type';
 
 interface DeelnameLinkProps {
     evenement: Evenement;
+    /** 'deelnemen' (default): the visitors' join link /e/{code}. 'terminal': only the bar terminal code, no link. */
+    soort?: 'deelnemen' | 'terminal';
 }
 
 // Same colors as the app: zinc-950 modules on white, so the code scans well on screen and on paper.
@@ -14,14 +16,14 @@ const QR_OPTIES = {
     color: { dark: '#09090b', light: '#ffffff' },
 };
 
-function bestandsnaam(naam: string): string {
+function bestandsnaam(naam: string, achtervoegsel: string): string {
     const slug = naam
         .normalize('NFD')
         .replace(/[̀-ͯ]/g, '')
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
-    return `lagapay-${slug || 'evenement'}-qr`;
+    return `lagapay-${slug || 'evenement'}-${achtervoegsel}`;
 }
 
 function download(href: string, naam: string) {
@@ -61,10 +63,15 @@ async function kopieer(tekst: string): Promise<boolean> {
 /**
  * Join link + QR code of an evenement ({link_url}/e/{code}), with copy, share and PNG/SVG download.
  * Visitors scan the QR code in the LagaPay app or open the link on their phone.
+ * With soort="terminal" the same card shows only the terminal code (QR code included) for bar devices: the app's
+ * Terminal worden screen takes the bare code.
  */
-export default function DeelnameLink({ evenement }: DeelnameLinkProps) {
+export default function DeelnameLink({ evenement, soort = 'deelnemen' }: DeelnameLinkProps) {
     const { link_url } = usePage().props as unknown as { link_url: string };
-    const link = evenement.code ? `${link_url}/e/${evenement.code}` : null;
+    const terminal = soort === 'terminal';
+    const code = terminal ? evenement.terminal_code : evenement.code;
+    // What the QR code holds and the field shows: the join link, or for a terminal just its code.
+    const link = code ? (terminal ? code : `${link_url}/e/${code}`) : null;
 
     const [svg, setSvg] = useState<string | null>(null);
     // 1024px PNG, sharp enough to print on a poster. Made up front: iOS Safari only allows
@@ -96,7 +103,7 @@ export default function DeelnameLink({ evenement }: DeelnameLinkProps) {
         return null;
     }
 
-    const naam = bestandsnaam(evenement.naam);
+    const naam = bestandsnaam(evenement.naam, terminal ? 'terminal-qr' : 'qr');
 
     const handleKopieer = async () => {
         setFout(null);
@@ -104,7 +111,7 @@ export default function DeelnameLink({ evenement }: DeelnameLinkProps) {
             setGekopieerd(true);
             setTimeout(() => setGekopieerd(false), 2000);
         } else {
-            setFout('Kopiëren lukte niet. Selecteer de link en kopieer hem handmatig.');
+            setFout(`Kopiëren lukte niet. Selecteer de ${terminal ? 'code' : 'link'} en kopieer hem handmatig.`);
         }
     };
 
@@ -121,19 +128,23 @@ export default function DeelnameLink({ evenement }: DeelnameLinkProps) {
 
     const handleDelen = async () => {
         setFout(null);
-        const tekst = `Doe mee met ${evenement.naam} in de LagaPay app.`;
+        const tekst = terminal
+            ? `Terminalcode voor ${evenement.naam}: ${link} (LagaPay app, Profiel > Terminal worden).`
+            : `Doe mee met ${evenement.naam} in de LagaPay app.`;
+        // A terminal code is not a link: share it as text only.
+        const url = terminal ? undefined : link;
         try {
             // Share the QR image along with the link where the browser supports sharing files.
             const bestand = png ? dataUrlNaarBestand(png, `${naam}.png`) : null;
             if (bestand && navigator.canShare?.({ files: [bestand] })) {
-                await navigator.share({ title: evenement.naam, text: tekst, url: link, files: [bestand] });
+                await navigator.share({ title: evenement.naam, text: tekst, url, files: [bestand] });
             } else {
-                await navigator.share({ title: evenement.naam, text: tekst, url: link });
+                await navigator.share({ title: evenement.naam, text: tekst, url });
             }
         } catch (e) {
             // Closing the share sheet is not an error.
             if (!(e instanceof DOMException && e.name === 'AbortError')) {
-                setFout('Delen lukte niet. Kopieer de link of download de QR-code.');
+                setFout(`Delen lukte niet. Kopieer de ${terminal ? 'code' : 'link'} of download de QR-code.`);
             }
         }
     };
@@ -147,7 +158,7 @@ export default function DeelnameLink({ evenement }: DeelnameLinkProps) {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V6a2 2 0 012-2h2M16 4h2a2 2 0 012 2v2M20 16v2a2 2 0 01-2 2h-2M8 20H6a2 2 0 01-2-2v-2" />
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 9h2v2H9zM13 13h2v2h-2zM13 9h2M9 13v2" />
                 </svg>
-                Deelnemen
+                {terminal ? 'Terminal koppelen' : 'Deelnemen'}
             </h2>
 
             <div className="flex flex-col sm:flex-row gap-6">
@@ -155,7 +166,7 @@ export default function DeelnameLink({ evenement }: DeelnameLinkProps) {
                     {svg ? (
                         <img
                             src={`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`}
-                            alt={`QR-code om deel te nemen aan ${evenement.naam}`}
+                            alt={terminal ? `QR-code om terminal te worden voor ${evenement.naam}` : `QR-code om deel te nemen aan ${evenement.naam}`}
                             className="w-full h-full"
                         />
                     ) : (
@@ -165,8 +176,18 @@ export default function DeelnameLink({ evenement }: DeelnameLinkProps) {
 
                 <div className="flex-1 min-w-0 space-y-4">
                     <p className="text-sm text-zinc-400">
-                        Bezoekers scannen deze QR-code in de LagaPay app of openen de link op hun telefoon.
-                        Daarna zijn ze deelnemer van dit evenement.
+                        {terminal ? (
+                            <>
+                                Barmedewerkers scannen deze QR-code in de LagaPay app (Profiel &rarr; Terminal worden)
+                                of vullen de terminalcode in. Hun toestel wordt dan een terminal waarmee ze munten
+                                afschrijven. Deel deze code niet met bezoekers.
+                            </>
+                        ) : (
+                            <>
+                                Bezoekers scannen deze QR-code in de LagaPay app of openen de link op hun telefoon.
+                                Daarna zijn ze deelnemer van dit evenement.
+                            </>
+                        )}
                     </p>
 
                     <div className="flex items-center gap-2">
@@ -174,13 +195,16 @@ export default function DeelnameLink({ evenement }: DeelnameLinkProps) {
                             readOnly
                             value={link}
                             onFocus={(e) => e.currentTarget.select()}
-                            className="flex-1 min-w-0 px-3 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl font-mono text-xs sm:text-sm text-purple-300 focus:outline-none focus:border-purple-500"
+                            aria-label={terminal ? 'Terminalcode' : 'Deelnamelink'}
+                            className={`flex-1 min-w-0 px-3 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl font-mono text-purple-300 focus:outline-none focus:border-purple-500 ${
+                                terminal ? 'text-base sm:text-lg tracking-wider' : 'text-xs sm:text-sm'
+                            }`}
                         />
                         <button
                             onClick={handleKopieer}
                             className={`${knop} shrink-0 bg-purple-700 hover:bg-purple-800 text-white shadow-md shadow-purple-950/40`}
                         >
-                            {gekopieerd ? 'Gekopieerd' : 'Kopieer link'}
+                            {gekopieerd ? 'Gekopieerd' : terminal ? 'Kopieer code' : 'Kopieer link'}
                         </button>
                     </div>
 
@@ -217,7 +241,9 @@ export default function DeelnameLink({ evenement }: DeelnameLinkProps) {
 
                     {!evenement.open && (
                         <p className="text-xs text-zinc-500">
-                            Dit evenement is gesloten. Nieuwe deelnemers kunnen niet meer meedoen via deze link.
+                            {terminal
+                                ? 'Dit evenement is gesloten. Toestellen kunnen geen terminal meer worden.'
+                                : 'Dit evenement is gesloten. Nieuwe deelnemers kunnen niet meer meedoen via deze link.'}
                         </p>
                     )}
                     {fout && <p className="text-xs text-red-400">{fout}</p>}

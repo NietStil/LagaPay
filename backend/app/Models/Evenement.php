@@ -27,7 +27,18 @@ class Evenement extends Model
         'heeft_tickets',
         'munt_prijs',
         'code',
+        'terminal_code',
     ];
+
+    /** Closing an evenement logs every terminal out (the app then returns to the home screen). */
+    protected static function booted(): void
+    {
+        static::updated(function (Evenement $evenement) {
+            if ($evenement->wasChanged('open') && ! $evenement->open) {
+                $evenement->terminals()->update(['actief' => false]);
+            }
+        });
+    }
 
     protected function casts(): array
     {
@@ -87,5 +98,10 @@ class Evenement extends Model
     public function munten(): HasMany
     {
         return $this->hasMany(Munt::class, 'evenement_id');
+    }
+
+    public function terminals(): HasMany
+    {
+        return $this->hasMany(Terminal::class, 'evenement_id');
     }
 }

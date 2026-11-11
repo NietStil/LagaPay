@@ -29,6 +29,8 @@ export { HeroCard, type HeroCardProps, type HeroCardVariant } from './hero-card'
 export { Icon, ICON_NAMES, type IconName, type IconProps } from './icon';
 export { kleuren } from './kleuren';
 export { QrCode, type QrCodeProps } from './qr-code';
+export { QrScanner, type QrScannerProps } from './qr-scanner';
+export { ScanRingen, type ScanRingenProps } from './scan-ringen';
 export {
   Pill,
   StatusPill,

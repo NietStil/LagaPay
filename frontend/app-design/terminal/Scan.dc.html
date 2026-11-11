@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Bar terminal, QR-code scannen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#d8b4fe}a:hover{color:#e9d5ff}
+@keyframes scanLine{0%{top:8%}50%{top:88%}100%{top:8%}}
+.scan-line{animation:scanLine 2.6s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.scan-line{animation:none;top:48%}}
+</style>
+</helmet>
+<div style="position:relative;width:390px;height:844px;overflow:hidden;box-sizing:border-box;background:#09090b;color:#fafafa;font-family:-apple-system,system-ui,'Segoe UI',sans-serif;display:flex;flex-direction:column">
+
+<div style="padding:56px 20px 0">
+<h1 style="margin:0;font-size:22px;font-weight:700;letter-spacing:-0.3px">Scannen</h1>
+</div>
+
+<div style="flex:1;min-height:0;padding:18px 20px 20px;display:flex;flex-direction:column;gap:16px">
+<div style="position:relative;flex:1;border-radius:24px;background:#131316;border:1px solid #27272a;overflow:hidden;display:flex;align-items:center;justify-content:center">
+<div style="position:absolute;top:14px;left:16px;font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:#71717a">Camerabeeld</div>
+<div style="position:relative;width:236px;height:236px">
+<div style="position:absolute;top:0;left:0;width:44px;height:44px;border-top:4px solid {{accent}};border-left:4px solid {{accent}};border-top-left-radius:20px"></div>
+<div style="position:absolute;top:0;right:0;width:44px;height:44px;border-top:4px solid {{accent}};border-right:4px solid {{accent}};border-top-right-radius:20px"></div>
+<div style="position:absolute;bottom:0;left:0;width:44px;height:44px;border-bottom:4px solid {{accent}};border-left:4px solid {{accent}};border-bottom-left-radius:20px"></div>
+<div style="position:absolute;bottom:0;right:0;width:44px;height:44px;border-bottom:4px solid {{accent}};border-right:4px solid {{accent}};border-bottom-right-radius:20px"></div>
+<div class="scan-line" style="position:absolute;left:14px;right:14px;height:2px;border-radius:2px;background:#d8b4fe;box-shadow:0 0 12px 2px rgba(216,180,254,.55)"></div>
+</div>
+</div>
+<div style="text-align:center">
+<div style="font-size:16px;font-weight:700">Richt de camera op een QR-code</div>
+<div style="margin-top:4px;font-size:13px;color:#a1a1aa">De code wordt automatisch herkend.</div>
+</div>
+</div>
+
+<nav aria-label="Hoofdmenu" style="height:82px;box-sizing:border-box;padding:8px 8px 22px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:#09090b;border-top:1px solid #27272a">
+<a href="Transacties.dc.html" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#a1a1aa;font-size:11px;font-weight:600">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"></path><path d="M9 8h6M9 12h6"></path></svg>
+Transacties
+</a>
+<a href="Main.dc.html" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#a1a1aa;font-size:11px;font-weight:600">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"></rect><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"></rect><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"></rect><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"></rect></svg>
+Producten
+</a>
+<a href="Scan.dc.html" aria-current="page" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#d8b4fe;font-size:11px;font-weight:600">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"></path><path d="M7 12h10"></path></svg>
+Scan
+</a>
+<a href="#" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#a1a1aa;font-size:11px;font-weight:600">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"></path><path d="M10 16l-4-4 4-4"></path><path d="M6 12h10"></path></svg>
+Verlaten
+</a>
+</nav>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#7e22ce","options":["#7e22ce","#6b21a8","#a21caf","#be123c"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { accent: this.props.accent ?? '#7e22ce' };
+  }
+}
+</script>
+</body>
+</html>
