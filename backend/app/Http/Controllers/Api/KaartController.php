@@ -7,7 +7,6 @@ use App\Services\Mobiel\KaartService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class KaartController extends Controller
 {
@@ -27,17 +26,16 @@ class KaartController extends Controller
         );
     }
 
+    /** { kaart_id } (one of my persoonlijke kaarten) → the kaarten of this evenement, see evenement(). */
     public function permanent(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'soort' => ['required', 'string', Rule::in(KaartService::SOORTEN)],
-        ]);
+        $validated = $request->validate(['kaart_id' => ['required', 'integer']]);
 
         try {
-            $kaarten = $this->kaartService->koppelPermanent(
+            $kaarten = $this->kaartService->koppelPersoonlijk(
                 $request->user(),
                 $request->attributes->get('evenement'),
-                $validated['soort'],
+                (int) $validated['kaart_id'],
             );
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);

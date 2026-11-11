@@ -65,6 +65,8 @@ export interface EvenementOverzicht {
   groep: { id: number; naam: string } | null;
   /** My groep's id when I last switched to the Groep page (then the evenement opens there), otherwise null. */
   betaalbron: number | null;
+  /** My one kaart of this evenement, or null when none is linked. */
+  kaart: Kaart | null;
 }
 
 export interface GroepLid {
@@ -82,7 +84,6 @@ export interface Kaart {
   id: number;
   uid_laatste4: string;
   permanent: boolean;
-  actief: boolean;
   status: KaartStatus;
   evenement: { id: number; naam: string } | null;
 }
@@ -94,7 +95,6 @@ export interface GroepDetail {
   uitnodigingslink: string;
   leden: GroepLid[];
   mijn_aandeel: number;
-  kaart: Kaart | null;
   activiteit: Transactie[];
 }
 
@@ -108,16 +108,13 @@ export interface ProfielKaarten {
   tijdelijke_kaarten: Kaart[];
 }
 
-export type KaartSoort = 'persoonlijk' | 'groep';
-
 /** Which wallet: my own or my groep's. */
 export type PersoonlijkOfGroep = 'persoonlijk' | 'groep';
 
+/** Kaart koppelen: my one kaart in an evenement plus my persoonlijke kaarten (newest first) to pick from. */
 export interface EvenementKaarten {
-  persoonlijk: Kaart | null;
-  groep: Kaart | null;
-  permanente_kaart: Kaart | null;
-  groep_info: { id: number; naam: string } | null;
+  kaart: Kaart | null;
+  persoonlijke_kaarten: Kaart[];
 }
 
 /** Tickets tab: my bought tickets of one evenement. */

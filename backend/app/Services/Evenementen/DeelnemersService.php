@@ -6,6 +6,7 @@ use App\Models\Evenement;
 use App\Models\Gebruiker;
 use App\Models\Groep;
 use App\Models\Kaart;
+use App\Models\KaartKoppeling;
 use App\Models\Munt;
 use App\Models\Terminal;
 use App\Models\Ticket;
@@ -67,9 +68,10 @@ class DeelnemersService {
             )
             ->selectSub(
                 Kaart::selectRaw("GROUP_CONCAT(kaarten.uid SEPARATOR ', ')")
-                    ->whereColumn('kaarten.gebruiker_id', 'gebruikers.id')
-                    ->where('kaarten.evenement_id', $id)
-                    ->where('kaarten.actief', 1),
+                    ->join('kaart_koppelingen', 'kaart_koppelingen.kaart_id', '=', 'kaarten.id')
+                    ->whereColumn('kaart_koppelingen.gebruiker_id', 'gebruikers.id')
+                    ->where('kaart_koppelingen.evenement_id', $id)
+                    ->where('kaart_koppelingen.actief', 1),
                 'kaarten_uids'
             )
             ->selectSub(
@@ -128,8 +130,9 @@ class DeelnemersService {
             ->update(['geblokkeerd' => false, 'updated_at' => now()]);
     }
 
+    /** Deactivates the deelnemer's kaart at this evenement only (a persoonlijke kaart keeps working elsewhere). */
     public function kaartenDeactiveren($evenementId, $gebruikerId) {
-        Kaart::where('gebruiker_id', $gebruikerId)
+        KaartKoppeling::where('gebruiker_id', $gebruikerId)
             ->where('evenement_id', $evenementId)
             ->update(['actief' => false]);
     }

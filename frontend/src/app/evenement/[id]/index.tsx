@@ -11,7 +11,6 @@ import {
   ErrorState,
   HeroButton,
   HeroCard,
-  ListRow,
   LoadingState,
   Screen,
   SectionLabel,
@@ -44,30 +43,21 @@ export default function EvenementOverzichtScreen() {
     );
   }
 
-  const { evenement, saldo, activiteit } = data;
+  const { evenement, saldo, activiteit, kaart } = data;
 
   return (
     <Screen onRefresh={refresh} refreshing={refreshing}>
-      <EvenementKop evenementId={id} evenement={evenement} actief="persoonlijk" />
+      <EvenementKop evenementId={id} evenement={evenement} actief="persoonlijk" kaart={kaart} />
       {error ? <ErrorBanner message={error} /> : null}
 
       {evenement.open ? (
-        <>
-          <HeroCard amount={formatMunten(saldo)}>
-            <HeroButton
-              title="Opwaarderen"
-              icon="plus"
-              onPress={() => router.push(`/evenement/${id}/opwaarderen?voor=persoonlijk`)}
-            />
-          </HeroCard>
-          {/* Betalen (NFC) is out of scope, so Kaarten is the only entry: a full-width row instead of a 2-column grid. */}
-          <ListRow
-            icon="card"
-            title="Kaart"
-            subtitle="Je kaart voor dit evenement"
-            onPress={() => router.push(`/evenement/${id}/koppelen?soort=persoonlijk`)}
+        <HeroCard amount={formatMunten(saldo)}>
+          <HeroButton
+            title="Opwaarderen"
+            icon="plus"
+            onPress={() => router.push(`/evenement/${id}/opwaarderen?voor=persoonlijk`)}
           />
-        </>
+        </HeroCard>
       ) : (
         <HeroCard variant="muted" amount={formatMunten(saldo)}>
           {!evenement.munten_terugstorten ? (

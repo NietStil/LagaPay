@@ -60,7 +60,7 @@ class MobielApiTest extends TestCase
                     ->assertExactJson(['message' => 'Evenement niet gevonden.']);
             }
 
-            $this->postJson($this->url("/evenementen/{$evenement->id}/kaarten/permanent"), ['soort' => 'persoonlijk'])
+            $this->postJson($this->url("/evenementen/{$evenement->id}/kaarten/permanent"))
                 ->assertNotFound();
         }
 
@@ -202,7 +202,7 @@ class MobielApiTest extends TestCase
             ->assertJsonPath('groep.saldo', 10)
             ->assertJsonPath('groep.uitnodigingslink', 'https://voorbeeld.nl/g/ROOD123')
             ->assertJsonPath('groep.mijn_aandeel', 2)
-            ->assertJsonPath('groep.kaart', null)
+            ->assertJsonMissingPath('groep.kaart')
             ->assertJsonPath('groep.leden', [
                 ['id' => $ik->id, 'naam' => 'Sam Jansen', 'initialen' => 'SJ', 'is_ik' => true, 'munten_gekocht' => 10, 'aandeel' => 2],
                 ['id' => $lisa->id, 'naam' => 'Lisa de Vries', 'initialen' => 'LV', 'is_ik' => false, 'munten_gekocht' => 30, 'aandeel' => 5],
@@ -499,7 +499,7 @@ class MobielApiTest extends TestCase
             ->assertJsonPath('groep.leden.0.id', $ik->id)
             ->assertJsonPath('groep.leden.0.is_ik', true)
             ->assertJsonCount(1, 'groep.leden')
-            ->assertJsonPath('groep.kaart', null)
+            ->assertJsonMissingPath('groep.kaart')
             ->assertJsonPath('groep.activiteit', []);
 
         $groep = Groep::findOrFail($response->json('groep.id'));
@@ -902,71 +902,80 @@ class MobielApiTest extends TestCase
             ->assertJsonPath('gekocht.0.aantal_gebruikt', 2);
     }
 
-    public function test_kaarten_fallback_en_permanente_koppeling(): void
+    public function test_een_kaart_per_evenement_en_permanente_koppeling(): void
     {
         $ik = $this->inloggen();
         $ander = Gebruiker::factory()->create();
         $evenement = $this->evenement(['open' => true]);
         $this->deelnemer($ik, $evenement);
 
-        $tijdelijk = $this->kaart($ik, $evenement, actief: true, uid: 'xxxxxxabcd');
-        $inactief = $this->kaart($ik, $evenement, actief: false);
-        $this->kaart($ander, $evenement, actief: true);
+        $tijdelijk = $this->kaart($ik, $evenement, uid: 'xxxxxxabcd');
+        $this->kaart($ander, $evenement);
+        // Deactivated by the dashboard at another evenement: inactief there.
+        $inactief = $this->kaart($ik, $this->evenement(['open' => true]), actief: false);
+        // A tijdelijke kaart without koppeling is not shown.
+        Kaart::factory()->create(['gebruiker_id' => $ik->id, 'type' => Kaart::TYPE_TIJDELIJK]);
 
         $this->getJson($this->url("/evenementen/{$evenement->id}/kaarten"))
             ->assertOk()
             ->assertExactJson([
-                'persoonlijk' => [
-                    'id' => $tijdelijk->id, 'uid_laatste4' => 'ABCD', 'permanent' => false, 'actief' => true, 'status' => 'actief',
+                'kaart' => [
+                    'id' => $tijdelijk->id, 'uid_laatste4' => 'ABCD', 'permanent' => false, 'status' => 'actief',
                     'evenement' => ['id' => $evenement->id, 'naam' => $evenement->naam],
                 ],
-                'groep'            => null,
-                'permanente_kaart' => null,
-                'groep_info'       => null,
+                'persoonlijke_kaarten' => [],
             ]);
 
-        $this->postJson($this->url("/evenementen/{$evenement->id}/kaarten/permanent"), ['soort' => 'persoonlijk'])
-            ->assertNotFound()
-            ->assertExactJson(['message' => 'Je hebt geen permanente kaart.']);
-
-        $this->kaart($ik, null, actief: true);
-        $permanent = $this->kaart($ik, null, actief: true, uid: 'abcdef9f9f');
-
-        $this->postJson($this->url("/evenementen/{$evenement->id}/kaarten/permanent"), ['soort' => 'iets'])
+        $this->postJson($this->url("/evenementen/{$evenement->id}/kaarten/permanent"))
             ->assertUnprocessable()
-            ->assertJsonValidationErrors('soort');
-        $this->postJson($this->url("/evenementen/{$evenement->id}/kaarten/permanent"), ['soort' => 'groep'])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('soort');
+            ->assertJsonValidationErrors('kaart_id');
 
-        $permanentWeergave = [
-            'id' => $permanent->id, 'uid_laatste4' => '9F9F', 'permanent' => true, 'actief' => true, 'status' => 'actief', 'evenement' => null,
+        $ouder = $this->kaart($ik, null, uid: 'abcdef1234');
+        $permanent = $this->kaart($ik, null, uid: 'abcdef9f9f');
+        $vanAnder = $this->kaart($ander, null);
+
+        $weergave = fn (Kaart $kaart, string $laatste4) => [
+            'id' => $kaart->id, 'uid_laatste4' => $laatste4, 'permanent' => true, 'status' => 'actief', 'evenement' => null,
         ];
+        $permanentWeergave = $weergave($permanent, '9F9F');
 
-        $this->postJson($this->url("/evenementen/{$evenement->id}/kaarten/permanent"), ['soort' => 'persoonlijk'])
+        // Not mine, or not a persoonlijke kaart: refused.
+        foreach ([$vanAnder->id, $tijdelijk->id, 999999] as $kaartId) {
+            $this->postJson($this->url("/evenementen/{$evenement->id}/kaarten/permanent"), ['kaart_id' => $kaartId])
+                ->assertNotFound()
+                ->assertExactJson(['message' => 'Deze persoonlijke kaart is niet gevonden.']);
+        }
+
+        $this->postJson($this->url("/evenementen/{$evenement->id}/kaarten/permanent"), ['kaart_id' => $permanent->id])
             ->assertOk()
-            ->assertJsonPath('persoonlijk', $permanentWeergave)
-            ->assertJsonPath('permanente_kaart', $permanentWeergave)
-            ->assertJsonPath('groep', null);
-        $this->postJson($this->url("/evenementen/{$evenement->id}/kaarten/permanent"), ['soort' => 'persoonlijk'])->assertOk();
-        $this->assertSame(1, KaartKoppeling::where('gebruiker_id', $ik->id)->count());
+            ->assertExactJson([
+                'kaart'                => $permanentWeergave,
+                'persoonlijke_kaarten' => [$permanentWeergave, $weergave($ouder, '1234')],
+            ]);
+        $this->postJson($this->url("/evenementen/{$evenement->id}/kaarten/permanent"), ['kaart_id' => $permanent->id])->assertOk();
+        // The persoonlijke kaart replaced the tijdelijke one: still one kaart for me in this evenement.
+        $this->assertSame(1, KaartKoppeling::where('gebruiker_id', $ik->id)->where('evenement_id', $evenement->id)->count());
+        $this->assertDatabaseMissing('kaart_koppelingen', ['kaart_id' => $tijdelijk->id]);
 
+        // Picking the other persoonlijke kaart replaces it again.
+        $this->postJson($this->url("/evenementen/{$evenement->id}/kaarten/permanent"), ['kaart_id' => $ouder->id])
+            ->assertOk()
+            ->assertJsonPath('kaart', $weergave($ouder, '1234'));
+        $this->postJson($this->url("/evenementen/{$evenement->id}/kaarten/permanent"), ['kaart_id' => $permanent->id])->assertOk();
+        $this->assertSame(1, KaartKoppeling::where('gebruiker_id', $ik->id)->where('evenement_id', $evenement->id)->count());
+
+        // The overzicht (both the Persoonlijk and the Groep page) shows the same one kaart above the tabs.
         $groep = Groep::factory()->create(['evenement_id' => $evenement->id]);
         $this->lidVan($ik, $groep);
-
-        $this->postJson($this->url("/evenementen/{$evenement->id}/kaarten/permanent"), ['soort' => 'groep'])
-            ->assertOk()
-            ->assertJsonPath('groep', $permanentWeergave)
-            ->assertJsonPath('groep_info', ['id' => $groep->id, 'naam' => $groep->naam]);
-        $this->assertDatabaseHas('kaart_koppelingen', [
-            'gebruiker_id' => $ik->id, 'evenement_id' => $evenement->id, 'soort' => 'groep', 'groep_id' => $groep->id, 'kaart_id' => $permanent->id,
-        ]);
-        $this->getJson($this->url("/evenementen/{$evenement->id}/groep"))->assertJsonPath('groep.kaart', $permanentWeergave);
+        $this->putJson($this->url("/evenementen/{$evenement->id}/betaalbron"), ['soort' => 'groep'])->assertOk();
+        $this->getJson($this->url("/evenementen/{$evenement->id}"))
+            ->assertJsonPath('kaart', $permanentWeergave)
+            ->assertJsonPath('betaalbron', $groep->id);
 
         $gesloten = $this->evenement(['open' => false]);
         $this->deelnemer($ik, $gesloten);
-        $verlopen = $this->kaart($ik, $gesloten, actief: true);
-        $this->postJson($this->url("/evenementen/{$gesloten->id}/kaarten/permanent"), ['soort' => 'persoonlijk'])
+        $verlopen = $this->kaart($ik, $gesloten);
+        $this->postJson($this->url("/evenementen/{$gesloten->id}/kaarten/permanent"), ['kaart_id' => $permanent->id])
             ->assertForbidden()
             ->assertExactJson(['message' => 'Dit evenement is gesloten.']);
 
@@ -974,7 +983,7 @@ class MobielApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('permanente_kaart', $permanentWeergave);
         $this->assertSame(
-            [[$verlopen->id, 'verlopen'], [$inactief->id, 'inactief'], [$tijdelijk->id, 'actief']],
+            [[$verlopen->id, 'verlopen'], [$inactief->id, 'inactief']],
             array_map(fn ($k) => [$k['id'], $k['status']], $profiel->json('tijdelijke_kaarten')),
         );
     }
@@ -984,10 +993,10 @@ class MobielApiTest extends TestCase
         $ik = Gebruiker::factory()->create();
         $evenement = $this->evenement();
         $groep = Groep::factory()->create(['evenement_id' => $evenement->id]);
-        $permanent = $this->kaart($ik, null, actief: true);
+        $permanent = $this->kaart($ik, null);
 
-        KaartKoppeling::create(['kaart_id' => $permanent->id, 'gebruiker_id' => $ik->id, 'evenement_id' => $evenement->id, 'soort' => 'persoonlijk']);
-        KaartKoppeling::create(['kaart_id' => $permanent->id, 'gebruiker_id' => $ik->id, 'evenement_id' => $evenement->id, 'groep_id' => $groep->id, 'soort' => 'groep']);
+        $ik->evenementen()->attach($evenement->id, ['betaalbron' => $groep->id]);
+        KaartKoppeling::create(['kaart_id' => $permanent->id, 'gebruiker_id' => $ik->id, 'evenement_id' => $evenement->id]);
         TicketUitnodiging::voor($ik->id, $evenement->id);
 
         app(EvenementService::class)->deleteEvenement($evenement->id);
@@ -1192,14 +1201,15 @@ class MobielApiTest extends TestCase
         ]);
     }
 
-    private function kaart(Gebruiker $gebruiker, ?Evenement $evenement, bool $actief, ?string $uid = null): Kaart
+    /** A persoonlijke kaart (no $evenement), or a tijdelijke kaart linked to $evenement. */
+    private function kaart(Gebruiker $gebruiker, ?Evenement $evenement, ?string $uid = null, bool $actief = true): Kaart
     {
-        return Kaart::factory()->create(array_filter([
+        $factory = $evenement ? Kaart::factory()->tijdelijkVoor($evenement, $actief) : Kaart::factory();
+
+        return $factory->create(array_filter([
             'gebruiker_id' => $gebruiker->id,
-            'evenement_id' => $evenement?->id,
-            'actief'       => $actief,
             'uid'          => $uid,
-        ], fn ($waarde) => $waarde !== null) + ['evenement_id' => null]);
+        ], fn ($waarde) => $waarde !== null));
     }
 
     private function ticket(Evenement $evenement, float $prijs, ?string $naam = null, ?int $munten = null): Ticket

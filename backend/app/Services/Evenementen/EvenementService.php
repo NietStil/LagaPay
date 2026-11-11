@@ -71,8 +71,7 @@ class EvenementService {
             Product::whereIn('categorie_id', $evenement->productCategorieen()->select('id'))->delete();
             $evenement->productCategorieen()->delete();
 
-            // Kaarten belong to a gebruiker, so they are detached rather than deleted.
-            $evenement->kaarten()->update(['evenement_id' => null]);
+            // Kaarten belong to a gebruiker and stay; their kaart_koppelingen go with the evenement (cascade).
 
             $evenement->deelnemers()->detach();
             $evenement->delete();

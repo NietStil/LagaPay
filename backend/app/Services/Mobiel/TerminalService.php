@@ -146,36 +146,26 @@ class TerminalService {
     }
 
     /**
-     * Development only (config lagapay.dev_scan): books the sale as if a wristband was scanned, without looking at
-     * the saldo (it may go below 0). Paid by the wallet of a random actieve kaart linked to this evenement (of a
-     * deelnemer), or, without one, by the terminal's own persoonlijk wallet.
+     * Development only (config lagapay.dev_scan): books the sale as if the logged-in account scanned its own kaart,
+     * without looking at the saldo (it may go below 0). It pays from its betaalbron, like a real scan: the groep's
+     * wallet when Groep is selected, otherwise the persoonlijk wallet. Nothing is booked when the account isn't a
+     * (non-blocked) deelnemer of this evenement.
      *
      * @throws ModelNotFoundException a product that isn't of this evenement
-     * @throws TerminalFout evenement gesloten
+     * @throws TerminalFout evenement gesloten, or the account isn't a deelnemer (403)
      */
-    public function devAfrekenen(Evenement $evenement, Gebruiker $terminal, array $bestelling): array {
+    public function devAfrekenen(Evenement $evenement, Gebruiker $gebruiker, array $bestelling): array {
         if (! $evenement->open) {
             throw new TerminalFout('Dit evenement is gesloten.', 403);
         }
 
         $totaal = $this->totaal($evenement, $bestelling);
 
-        $gekoppeld = KaartKoppeling::where('evenement_id', $evenement->id)->pluck('kaart_id');
-        $kaarten = Kaart::where('actief', true)
-            ->where(fn ($query) => $query->where('evenement_id', $evenement->id)->orWhereIn('id', $gekoppeld))
-            ->inRandomOrder()
-            ->get();
-
-        // The first kaart (in random order) that belongs to a deelnemer's wallet pays.
-        [$gebruiker, $groep] = [$terminal, null];
-        foreach ($kaarten as $kaart) {
-            try {
-                [$gebruiker, $groep] = $this->portemonneeVanKaart($evenement, $kaart->uid);
-                break;
-            } catch (TerminalFout) {
-                continue;
-            }
+        if (! $this->toegang->deelnemerEvenement($gebruiker, $evenement->id)) {
+            throw new TerminalFout('Je bent geen deelnemer van dit evenement, dus er is niets afgeschreven.', 403);
         }
+
+        $groep = $this->toegang->betaalGroep($gebruiker->id, $evenement->id);
 
         return $this->boekVerkoop($evenement, $bestelling, $totaal, $gebruiker, $groep, saldoControleren: false);
     }
@@ -247,52 +237,40 @@ class TerminalService {
     }
 
     /**
-     * Who pays for a scanned kaart: [owner, groep or null]. The kaart's slot (kaart koppelen) in this evenement
-     * decides; without a koppeling, a tijdelijke kaart of this evenement pays from the owner's persoonlijk saldo.
+     * Who pays for a scanned kaart: [owner, groep or null]. The kaart must be the owner's kaart of this evenement
+     * (kaart_koppelingen) and actief at this evenement. It pays from the owner's betaalbron: the
+     * groep's wallet when that is the owner's groep, otherwise the persoonlijk wallet.
      *
      * @throws TerminalFout
      */
     protected function portemonneeVanKaart(Evenement $evenement, string $kaartUid): array {
-        $kaarten = Kaart::where('uid', $kaartUid)->where('actief', true)->get();
+        $kaartIds = Kaart::where('uid', $kaartUid)->pluck('id');
 
-        if ($kaarten->isEmpty()) {
-            throw new TerminalFout('Deze kaart is onbekend of niet actief.', 404);
+        if ($kaartIds->isEmpty()) {
+            throw new TerminalFout('Deze kaart is onbekend.', 404);
         }
 
-        $koppeling = KaartKoppeling::with(['gebruiker', 'groep'])
-            ->whereIn('kaart_id', $kaarten->pluck('id'))
+        $koppeling = KaartKoppeling::with('gebruiker')
+            ->whereIn('kaart_id', $kaartIds)
             ->where('evenement_id', $evenement->id)
-            ->orderByRaw('soort = ? desc', [KaartKoppeling::SOORT_PERSOONLIJK])
+            ->orderByDesc('actief')
             ->first();
 
-        if ($koppeling) {
-            $gebruiker = $koppeling->gebruiker;
-            $groep = null;
-
-            if ($koppeling->soort === KaartKoppeling::SOORT_GROEP) {
-                $groep = $koppeling->groep;
-                $mijnGroep = $this->toegang->mijnGroep($gebruiker->id, $evenement->id);
-
-                if (! $groep || ! $mijnGroep || $mijnGroep->id !== $groep->id) {
-                    throw new TerminalFout('Deze groepskaart hoort bij een groep waar de eigenaar niet meer in zit.', 403);
-                }
-            }
-        } else {
-            $tijdelijk = $kaarten->firstWhere('evenement_id', $evenement->id);
-
-            if (! $tijdelijk) {
-                throw new TerminalFout('Deze kaart is niet gekoppeld aan dit evenement.', 404);
-            }
-
-            $gebruiker = $tijdelijk->gebruiker;
-            $groep = null;
+        if (! $koppeling) {
+            throw new TerminalFout('Deze kaart is niet gekoppeld aan dit evenement.', 404);
         }
+
+        if (! $koppeling->actief) {
+            throw new TerminalFout('Deze kaart is gedeactiveerd voor dit evenement.', 403);
+        }
+
+        $gebruiker = $koppeling->gebruiker;
 
         if (! $gebruiker || ! $this->toegang->deelnemerEvenement($gebruiker, $evenement->id)) {
             throw new TerminalFout('De eigenaar van deze kaart is geen deelnemer van dit evenement.', 403);
         }
 
-        return [$gebruiker, $groep];
+        return [$gebruiker, $this->toegang->betaalGroep($gebruiker->id, $evenement->id)];
     }
 
     /** Saldo of the wallet (sum of its munten rows, see API.md), optionally locking the rows. */

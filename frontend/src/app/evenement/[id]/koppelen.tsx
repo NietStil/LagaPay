@@ -1,8 +1,8 @@
 // Screens 10 + 12 — Kaart koppelen (KaartKoppelen.dc.html / KaartKoppelenGroep.dc.html).
-// Params: id, soort = 'persoonlijk' (default) | 'groep'. Opened from "Kaarten" on the Persoonlijk page and from
-// "Groepskaart" on the Groep page.
-// The scan part (rings + "Scan je kaart") is only the design: reading NFC tags isn't built yet. Until then the
-// slot is filled with "Gebruik mijn permanente kaart".
+// Params: id, terug = 'groep' when opened from the Groep page (back goes there), otherwise the Persoonlijk page.
+// I have one kaart per evenement; it pays from my betaalbron (the Persoonlijk|Groep side I last switched to).
+// The scan part (rings + "Scan je kaart") is only the design: reading NFC tags isn't built yet. Until then a kaart
+// is linked by picking one of my persoonlijke kaarten from the list at the bottom.
 
 import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
@@ -15,33 +15,33 @@ import {
   Icon,
   IconBox,
   LoadingState,
-  Pill,
   ScanRingen,
   Screen,
   ScreenHeader,
+  SectionLabel,
   goBack,
   kleuren,
 } from '@/components/lagapay';
 import { useApiData } from '@/hooks/use-api-data';
-import { foutmelding, getEvenementKaarten, getEvenementOverzicht, koppelPermanenteKaart } from '@/lib/api/lagapay';
-import type { Kaart, KaartSoort } from '@/lib/api/types';
+import { foutmelding, getEvenementKaarten, getEvenementOverzicht, koppelPersoonlijkeKaart } from '@/lib/api/lagapay';
+import type { Kaart } from '@/lib/api/types';
 import { maskUid } from '@/lib/format';
 import { meld } from '@/lib/melding';
 
-/** The evenement (naam, open) plus my kaart slots. */
+/** The evenement (naam, open) plus my kaart. */
 async function laad(evenementId: string) {
   const [overzicht, kaarten] = await Promise.all([getEvenementOverzicht(evenementId), getEvenementKaarten(evenementId)]);
   return { evenement: overzicht.evenement, kaarten };
 }
 
 export default function KoppelenScreen() {
-  const params = useLocalSearchParams<{ id: string; soort?: string }>();
+  const params = useLocalSearchParams<{ id: string; terug?: string }>();
   const id = params.id;
-  const soort: KaartSoort = params.soort === 'groep' ? 'groep' : 'persoonlijk';
-  const terugHref: Href = soort === 'groep' ? `/evenement/${id}/groep` : `/evenement/${id}`;
+  const terugHref: Href = params.terug === 'groep' ? `/evenement/${id}/groep` : `/evenement/${id}`;
 
   const { data, error, loading, reload } = useApiData(() => laad(id), [id]);
-  const [bezig, setBezig] = useState(false);
+  /** Id of the kaart being linked. */
+  const [bezig, setBezig] = useState<number | null>(null);
   const [fout, setFout] = useState<string | null>(null);
 
   const kop = (subtitle?: string) => (
@@ -58,27 +58,20 @@ export default function KoppelenScreen() {
   }
 
   const { evenement, kaarten } = data;
-  const groep = kaarten.groep_info;
-  const permanent = kaarten.permanente_kaart;
-  const huidig = soort === 'groep' ? kaarten.groep : kaarten.persoonlijk;
-  const voorLabel = soort === 'groep' ? (groep ? `Voor: Groep · ${groep.naam}` : 'Voor: Groep') : 'Voor: Persoonlijk';
+  const persoonlijk = kaarten.persoonlijke_kaarten;
+  const huidig = kaarten.kaart;
 
-  const koppel = async () => {
-    if (bezig) return;
-    setBezig(true);
+  const koppel = async (kaart: Kaart) => {
+    if (bezig !== null) return;
+    setBezig(kaart.id);
     setFout(null);
     try {
-      await koppelPermanenteKaart(id, soort);
-      meld(
-        'Kaart gekoppeld',
-        soort === 'groep' && groep
-          ? `Met je permanente kaart betaal je nu met het saldo van ${groep.naam}.`
-          : 'Met je permanente kaart betaal je nu met je eigen saldo.',
-      );
+      await koppelPersoonlijkeKaart(id, kaart.id);
+      meld('Kaart gekoppeld', `Bij ${evenement.naam} betaal je nu met ${maskUid(kaart.uid_laatste4)}.`);
       goBack(terugHref);
     } catch (err) {
       setFout(foutmelding(err));
-      setBezig(false);
+      setBezig(null);
     }
   };
 
@@ -89,14 +82,6 @@ export default function KoppelenScreen() {
         icon="lock"
         title="Dit evenement is gesloten"
         text="Bij een gesloten evenement kun je geen kaart meer koppelen."
-      />
-    );
-  } else if (soort === 'groep' && !groep) {
-    inhoud = (
-      <EmptyState
-        icon="user"
-        title="Je zit niet in een groep"
-        text="Word lid via de uitnodigingslink van een groep om een groepskaart te koppelen."
       />
     );
   } else {
@@ -117,14 +102,28 @@ export default function KoppelenScreen() {
 
         {fout ? <ErrorBanner message={fout} /> : null}
 
-        {permanent ? (
+        {persoonlijk.length > 0 ? (
           <View className="gap-4">
             <View className="flex-row items-center gap-3">
               <View className="h-px flex-1 bg-zinc-800" />
               <Text className="text-[13px] text-zinc-400">of</Text>
               <View className="h-px flex-1 bg-zinc-800" />
             </View>
-            <PermanenteKaartOptie kaart={permanent} gekoppeld={huidig?.id === permanent.id} bezig={bezig} onPress={koppel} />
+            <View>
+              <SectionLabel>Je persoonlijke kaarten</SectionLabel>
+              <View className="gap-2.5">
+                {persoonlijk.map((kaart) => (
+                  <PersoonlijkeKaartOptie
+                    key={kaart.id}
+                    kaart={kaart}
+                    gekoppeld={huidig?.id === kaart.id}
+                    bezig={bezig === kaart.id}
+                    uit={bezig !== null}
+                    onPress={() => koppel(kaart)}
+                  />
+                ))}
+              </View>
+            </View>
           </View>
         ) : null}
       </>
@@ -134,38 +133,40 @@ export default function KoppelenScreen() {
   return (
     <Screen gap={20}>
       {kop(evenement.naam)}
-      <Pill label={voorLabel} tone="accent" size="md" />
       {inhoud}
     </Screen>
   );
 }
 
-interface PermanenteKaartOptieProps {
+interface PersoonlijkeKaartOptieProps {
   kaart: Kaart;
-  /** The permanente kaart already is the kaart of this slot. */
+  /** This kaart already is my kaart of this evenement. */
   gekoppeld: boolean;
+  /** This kaart is being linked. */
   bezig: boolean;
+  /** Some kaart is being linked: all rows are disabled. */
+  uit: boolean;
   onPress: () => void;
 }
 
-/** "Gebruik mijn permanente kaart" row (design: radius 18, zinc-700 border, accent kaart icon, chevron). */
-function PermanenteKaartOptie({ kaart, gekoppeld, bezig, onPress }: PermanenteKaartOptieProps) {
-  const uit = gekoppeld || bezig;
+/** One persoonlijke kaart to link (design: radius 18, zinc-700 border, accent kaart icon, chevron). */
+function PersoonlijkeKaartOptie({ kaart, gekoppeld, bezig, uit, onPress }: PersoonlijkeKaartOptieProps) {
+  const disabled = gekoppeld || uit;
   return (
     <Pressable
       onPress={onPress}
-      disabled={uit}
+      disabled={disabled}
       accessibilityRole="button"
-      accessibilityLabel={`Gebruik mijn permanente kaart, ${maskUid(kaart.uid_laatste4)}${gekoppeld ? ', al gekoppeld' : ''}`}
-      accessibilityState={{ disabled: uit, busy: bezig }}
+      accessibilityLabel={`Koppel persoonlijke kaart ${maskUid(kaart.uid_laatste4)}${gekoppeld ? ', al gekoppeld' : ''}`}
+      accessibilityState={{ disabled, busy: bezig }}
       className={`flex-row items-center gap-3.5 rounded-[18px] border border-zinc-700 bg-zinc-900 px-4 py-3.5 ${
-        uit ? '' : 'active:opacity-80'
+        disabled ? '' : 'active:opacity-80'
       }`}
     >
       <IconBox icon="card" variant="accent" size={44} />
       <View className="min-w-0 flex-1">
         <Text numberOfLines={2} className="text-[15px] font-semibold text-zinc-50">
-          Gebruik mijn permanente kaart
+          Persoonlijke kaart
         </Text>
         <Text numberOfLines={1} className="mt-0.5 font-mono text-xs text-zinc-400">
           {maskUid(kaart.uid_laatste4)}

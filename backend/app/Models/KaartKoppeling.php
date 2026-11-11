@@ -5,11 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * Pivot kaart × evenement × gebruiker: the kaart of a gebruiker in an evenement (at most one per gebruiker per
+ * evenement). actief = the kaart works at this evenement (the dashboard deactivates it here); it is the only
+ * actief flag of a kaart.
+ * The wallet it pays from is the gebruiker's betaalbron in that evenement, see ToegangService::betaalGroep.
+ */
 class KaartKoppeling extends Model
 {
-    public const SOORT_PERSOONLIJK = 'persoonlijk';
-    public const SOORT_GROEP = 'groep';
-
     protected $table = 'kaart_koppelingen';
 
     public $timestamps = true;
@@ -18,9 +21,19 @@ class KaartKoppeling extends Model
         'kaart_id',
         'gebruiker_id',
         'evenement_id',
-        'groep_id',
-        'soort',
+        'actief',
     ];
+
+    protected $attributes = [
+        'actief' => true,
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'actief' => 'boolean',
+        ];
+    }
 
     public function kaart(): BelongsTo
     {
@@ -35,10 +48,5 @@ class KaartKoppeling extends Model
     public function evenement(): BelongsTo
     {
         return $this->belongsTo(Evenement::class, 'evenement_id');
-    }
-
-    public function groep(): BelongsTo
-    {
-        return $this->belongsTo(Groep::class, 'groep_id');
     }
 }

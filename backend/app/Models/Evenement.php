@@ -80,9 +80,11 @@ class Evenement extends Model
         return $this->hasManyThrough(Product::class, ProductCategorie::class, 'evenement_id', 'categorie_id');
     }
 
-    public function kaarten(): HasMany
+    public function kaarten(): BelongsToMany
     {
-        return $this->hasMany(Kaart::class, 'evenement_id');
+        return $this->belongsToMany(Kaart::class, 'kaart_koppelingen', 'evenement_id', 'kaart_id')
+            ->withPivot('gebruiker_id', 'actief')
+            ->withTimestamps();
     }
 
     public function opwaarderingen(): HasMany

@@ -60,10 +60,10 @@ export interface Kaart {
     id: number;
     uid: string;
     type: 'persoonlijk' | 'tijdelijk';
-    actief: boolean;
-    evenement_id: null | number | Evenement;
     gebruiker_id: null | number | Gebruiker;
     gebruiker?: Gebruiker;
+    /** Present when loaded via an evenement (kaart_koppelingen): actief = works at that evenement. */
+    pivot?: { gebruiker_id: number; actief: boolean };
 }
 
 export interface Transactie {

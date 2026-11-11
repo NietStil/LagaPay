@@ -5,7 +5,6 @@ namespace App\Services\Mobiel;
 use App\Models\Evenement;
 use App\Models\Gebruiker;
 use App\Models\Groep;
-use App\Models\KaartKoppeling;
 use App\Models\Munt;
 use App\Models\Transactie;
 use App\Services\Mobiel\Exceptions\DeelnameGeweigerd;
@@ -72,13 +71,6 @@ class GroepService {
             ->values()
             ->all();
 
-        $koppeling = KaartKoppeling::with('kaart.evenement:id,naam,open')
-            ->where('gebruiker_id', $gebruiker->id)
-            ->where('evenement_id', $evenement->id)
-            ->where('soort', KaartKoppeling::SOORT_GROEP)
-            ->where('groep_id', $groep->id)
-            ->first();
-
         $activiteit = Transactie::with('gebruiker:id,voornaam')
             ->where('groep_id', $groep->id)
             ->orderByDesc('created_at')
@@ -95,7 +87,6 @@ class GroepService {
             'uitnodigingslink' => $this->uitnodigingslink($groep),
             'leden'            => $ledenWeergave,
             'mijn_aandeel'     => $aandelen[$gebruiker->id] ?? 0,
-            'kaart'            => $this->weergave->kaart($koppeling?->kaart),
             'activiteit'       => $activiteit,
         ];
     }

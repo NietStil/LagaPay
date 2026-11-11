@@ -13,7 +13,6 @@ import type {
   GroepDetail,
   GescandTicket,
   GroepJoinResultaat,
-  KaartSoort,
   PersoonlijkOfGroep,
   MijnTickets,
   ProfielKaarten,
@@ -108,11 +107,9 @@ export async function getEvenementKaarten(evenementId: number | string): Promise
   return res.data;
 }
 
-export async function koppelPermanenteKaart(
-  evenementId: number | string,
-  soort: KaartSoort,
-): Promise<EvenementKaarten> {
-  const res = await apiClient.post(`/evenementen/${evenementId}/kaarten/permanent`, { soort });
+/** Makes one of my persoonlijke kaarten my one kaart of this evenement (replacing the previous one). */
+export async function koppelPersoonlijkeKaart(evenementId: number | string, kaartId: number): Promise<EvenementKaarten> {
+  const res = await apiClient.post(`/evenementen/${evenementId}/kaarten/permanent`, { kaart_id: kaartId });
   return res.data;
 }
 
@@ -204,8 +201,8 @@ export async function afrekenen(
 }
 
 /**
- * Development only (backend lagapay.dev_scan): afrekenen as if a random wristband of this evenement was scanned.
- * The saldo isn't checked, so the sale is always booked.
+ * Development only (backend lagapay.dev_scan): afrekenen as if my own kaart was scanned, from my selected
+ * Persoonlijk or Groep wallet. The saldo isn't checked; nothing is booked (403) when I'm not a deelnemer.
  */
 export async function devAfrekenen(
   evenementId: number | string,

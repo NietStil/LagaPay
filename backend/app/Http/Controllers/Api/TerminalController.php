@@ -66,8 +66,8 @@ class TerminalController extends Controller
     }
 
     /**
-     * Development only (config lagapay.dev_scan, otherwise 404): { producten } → like afrekenen, as if a wristband
-     * was scanned; the saldo isn't checked (see TerminalService::devAfrekenen).
+     * Development only (config lagapay.dev_scan, otherwise 404): { producten } → like afrekenen, paid by the
+     * logged-in account (from its betaalbron); the saldo isn't checked (see TerminalService::devAfrekenen).
      */
     public function devAfrekenen(Request $request): JsonResponse
     {

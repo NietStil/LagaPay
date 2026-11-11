@@ -5,6 +5,7 @@ namespace App\Services\Mobiel;
 use App\Models\Evenement;
 use App\Models\Groep;
 use App\Models\Kaart;
+use App\Models\KaartKoppeling;
 use App\Models\Transactie;
 use DateTimeInterface;
 use Illuminate\Support\Carbon;
@@ -58,16 +59,22 @@ class Weergave {
         return in_array($type, self::NEGATIEVE_TYPES, true) ? -abs($hoeveelheid) : abs($hoeveelheid);
     }
 
-    /** Expects the kaart's evenement relation to be loaded (id, naam, open) for tijdelijke kaarten. */
-    public function kaart(?Kaart $kaart): ?array {
+    /**
+     * A kaart, optionally as linked to one evenement ($koppeling, e.g. my kaart of this evenement).
+     * Without $koppeling a tijdelijke kaart shows its own koppeling (expects koppelingen.evenement to be loaded).
+     * Status: inactief when its koppeling is deactivated (or a tijdelijke kaart lost its evenement),
+     * verlopen when a tijdelijke kaart's evenement is gesloten.
+     */
+    public function kaart(?Kaart $kaart, ?KaartKoppeling $koppeling = null): ?array {
         if (! $kaart) {
             return null;
         }
 
-        $permanent = $kaart->evenement_id === null;
-        $evenement = $permanent ? null : $kaart->evenement;
+        $permanent = $kaart->isPersoonlijk();
+        $koppeling ??= $permanent ? null : $kaart->koppelingen->first();
+        $evenement = $permanent ? null : $koppeling?->evenement;
 
-        if (! $kaart->actief) {
+        if (($koppeling && ! $koppeling->actief) || (! $permanent && ! $koppeling)) {
             $status = 'inactief';
         } elseif ($evenement && ! $evenement->open) {
             $status = 'verlopen';
@@ -79,7 +86,6 @@ class Weergave {
             'id'           => $kaart->id,
             'uid_laatste4' => strtoupper(substr((string) $kaart->uid, -4)),
             'permanent'    => $permanent,
-            'actief'       => (bool) $kaart->actief,
             'status'       => $status,
             'evenement'    => $evenement ? ['id' => $evenement->id, 'naam' => $evenement->naam] : null,
         ];

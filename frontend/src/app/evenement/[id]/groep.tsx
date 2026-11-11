@@ -22,14 +22,8 @@ import {
 } from '@/components/lagapay';
 import { useApiData } from '@/hooks/use-api-data';
 import { getEvenementOverzicht, getGroep } from '@/lib/api/lagapay';
-import type { GroepDetail, GroepLid, Kaart, KaartStatus, Transactie } from '@/lib/api/types';
-import { formatMunten, formatTijd, maskUid } from '@/lib/format';
-
-const KAART_STATUS: Record<KaartStatus, string> = {
-  actief: 'Actief',
-  verlopen: 'Verlopen',
-  inactief: 'Inactief',
-};
+import type { GroepDetail, GroepLid, Transactie } from '@/lib/api/types';
+import { formatMunten, formatTijd } from '@/lib/format';
 
 const groepMeta = (t: Transactie) =>
   t.gebruiker ? `${formatTijd(t.datum)} · ${t.gebruiker.voornaam}` : formatTijd(t.datum);
@@ -50,11 +44,11 @@ export default function EvenementGroepScreen() {
     );
   }
 
-  const [{ evenement }, groep] = data;
+  const [{ evenement, kaart }, groep] = data;
 
   return (
     <Screen onRefresh={refresh} refreshing={refreshing}>
-      <EvenementKop evenementId={id} evenement={evenement} actief="groep" />
+      <EvenementKop evenementId={id} evenement={evenement} actief="groep" kaart={kaart} />
       {error ? <ErrorBanner message={error} /> : null}
 
       {!groep ? (
@@ -111,13 +105,6 @@ function GroepOpen({ evenementId, groep }: { evenementId: string; groep: GroepDe
         omschrijving="Laat deze QR-code scannen in de LagaPay app om lid te worden van de groep."
       />
 
-      <ListRow
-        icon="card"
-        title="Kaart"
-        subtitle={kaartOmschrijving(groep.kaart)}
-        onPress={() => router.push(`/evenement/${evenementId}/koppelen?soort=groep`)}
-      />
-
       {groep.leden.length > 0 ? (
         <View>
           <SectionLabel>Leden · munten gekocht</SectionLabel>
@@ -162,11 +149,6 @@ function GroepGesloten({ groep, terugstorten }: { groep: GroepDetail; terugstort
 
 // ---------------------------------------------------------------------------------------------
 // Parts
-
-function kaartOmschrijving(kaart: Kaart | null): string {
-  if (!kaart) return 'Nog niet gekoppeld';
-  return `${maskUid(kaart.uid_laatste4)} · ${KAART_STATUS[kaart.status]}`;
-}
 
 /** Leden in a divided card. Open: "munten gekocht" on the right; gesloten (`metAandeel`): "gekocht · aandeel". */
 function LedenLijst({ leden, metAandeel = false }: { leden: GroepLid[]; metAandeel?: boolean }) {

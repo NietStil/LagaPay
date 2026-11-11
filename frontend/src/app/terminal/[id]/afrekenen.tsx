@@ -1,7 +1,8 @@
 // Bar terminal — Afrekenen: the same scan screen as Kaart koppelen (pulsing rings), with the bestelling and total.
 // The munten are taken from the wallet of the scanned kaart (its slot in this evenement: persoonlijk or groep).
-// Reading NFC isn't built yet. Development builds get "Scan polsband (dev)", which books the sale on a random
-// linked kaart of this evenement, without checking the saldo (backend lagapay.dev_scan).
+// Reading NFC isn't built yet. Development builds get "Scan polsband (dev)", which books the sale on the logged-in
+// account (its selected Persoonlijk or Groep wallet), without checking the saldo (backend lagapay.dev_scan); it
+// books nothing when that account isn't a deelnemer of this evenement.
 // After paying the rings turn into a green circle with a check ("Betaald"). Tapping it, or waiting BETAALD_MS,
 // returns to the producten.
 
@@ -84,7 +85,7 @@ export default function AfrekenenScreen() {
       setBetaald({ resultaat, regels });
       leeg();
     } catch (err) {
-      // e.g. 403 evenement gesloten.
+      // e.g. 403 evenement gesloten, or I'm not a deelnemer of this evenement.
       setFout(foutmelding(err));
     } finally {
       setBezig(false);

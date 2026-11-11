@@ -66,4 +66,23 @@ class ToegangService {
             ->orderBy('id')
             ->first();
     }
+
+    /**
+     * The groep whose wallet my kaart pays from in this evenement: my groep when my betaalbron is that groep
+     * (I last switched to the Groep page), otherwise null = my persoonlijk wallet.
+     */
+    public function betaalGroep(int $gebruikerId, int $evenementId): ?Groep {
+        $groep = $this->mijnGroep($gebruikerId, $evenementId);
+
+        if (! $groep) {
+            return null;
+        }
+
+        $betaalbron = DB::table('gebruiker_evenement')
+            ->where('gebruiker_id', $gebruikerId)
+            ->where('evenement_id', $evenementId)
+            ->value('betaalbron');
+
+        return (int) $betaalbron === $groep->id ? $groep : null;
+    }
 }
