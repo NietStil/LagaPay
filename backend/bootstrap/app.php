@@ -16,6 +16,11 @@ return Application::configure(basePath: dirname(__DIR__))
             Route::middleware('api')
                 ->domain('api.' . parse_url(env('APP_URL', 'localhost'), PHP_URL_HOST))
                 ->group(__DIR__.'/../routes/api.php');
+
+            // Register the Organisator Subdomain (dashboard)
+            Route::middleware('web')
+                ->domain('organisator.' . parse_url(env('APP_URL', 'localhost'), PHP_URL_HOST))
+                ->group(__DIR__.'/../routes/organisator.php');
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
