@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\Mobiel\BetaalService;
+use App\Services\Mobiel\Exceptions\TicketsUitverkocht;
 use App\Services\Mobiel\TicketOverzichtService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
@@ -73,6 +74,8 @@ class BetaalController extends Controller
             $this->betaalService->koopTickets($request->user(), $evenement, $bestelling);
         } catch (ModelNotFoundException) {
             return response()->json(['message' => 'Ticket niet gevonden.'], 404);
+        } catch (TicketsUitverkocht $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
         } catch (\DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 403);
         }

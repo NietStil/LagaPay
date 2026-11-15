@@ -12,6 +12,7 @@ use App\Models\Ticket;
 use App\Models\TicketUitnodiging;
 use App\Models\Transactie;
 use App\Services\Evenementen\EvenementService;
+use App\Services\Evenementen\TicketService;
 use App\Services\Mobiel\GroepService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -640,6 +641,66 @@ class MobielApiTest extends TestCase
             ->assertExactJson(['message' => 'Dit evenement heeft geen tickets.']);
     }
 
+    public function test_tickets_kopen_tot_de_capaciteit_en_tickets_toevoegen(): void
+    {
+        config(['lagapay.test_betalingen' => true]);
+        $ik = $this->inloggen();
+        $evenement = $this->evenement(['heeft_tickets' => true, 'code' => 'CAPACITEIT-0001', 'start_datum' => now()->subHour()]);
+        $service = app(TicketService::class);
+        // Created like the dashboard does: Weekend has 3 in total, Dag is onbeperkt.
+        $weekend = $service->addTicket($evenement->id, ['naam' => 'Weekend', 'prijs' => 40, 'munten' => 0, 'capaciteit' => 3]);
+        $dag = $service->addTicket($evenement->id, ['naam' => 'Dag', 'prijs' => 25, 'munten' => 0]);
+        $this->assertSame(3, $weekend->fresh()->capaciteit);
+        $this->assertNull($dag->fresh()->capaciteit);
+
+        $this->postJson($this->url('/evenementen/bekijk'), ['code' => 'CAPACITEIT-0001'])->assertOk();
+        $url = $this->url("/evenementen/{$evenement->id}/tickets/kopen");
+
+        // Someone else already bought one Weekend ticket: it counts for everyone.
+        $ander = Gebruiker::factory()->create();
+        $ander->tickets()->attach($weekend->id, ['code' => 'ANDERCODE0001']);
+
+        $this->getJson($this->url("/evenementen/{$evenement->id}/tickets"))
+            ->assertOk()
+            ->assertJsonPath('tickets.0.id', $dag->id)
+            ->assertJsonPath('tickets.0.beschikbaar', null)
+            ->assertJsonPath('tickets.1.beschikbaar', 2);
+
+        // More than are left: refused (409), and nothing of the order is booked (also not the Dag tickets).
+        $this->postJson($url, ['tickets' => [['id' => $dag->id, 'aantal' => 1], ['id' => $weekend->id, 'aantal' => 3]]])
+            ->assertStatus(409)
+            ->assertExactJson(['message' => 'Er zijn nog maar 2 tickets van Weekend beschikbaar.']);
+        $this->assertSame(0, DB::table('gebruiker_ticket')->where('gebruiker_id', $ik->id)->count());
+
+        // Exactly what's left: fine, and then it's uitverkocht.
+        $this->postJson($url, ['tickets' => [['id' => $weekend->id, 'aantal' => 2]]])
+            ->assertOk()
+            ->assertJsonPath('tickets.1.aantal_gekocht', 2)
+            ->assertJsonPath('tickets.1.beschikbaar', 0);
+        $this->postJson($url, ['tickets' => [['id' => $weekend->id, 'aantal' => 1]]])
+            ->assertStatus(409)
+            ->assertExactJson(['message' => 'Weekend is uitverkocht.']);
+
+        // Onbeperkt keeps selling.
+        $this->postJson($url, ['tickets' => [['id' => $dag->id, 'aantal' => 10]]])->assertOk()->assertJsonPath('tickets.0.beschikbaar', null);
+
+        // The organisator adds 5 tickets: 5 for sale again.
+        $service->voegCapaciteitToe($evenement->id, $weekend->id, 5);
+        $this->assertSame(8, $weekend->fresh()->capaciteit);
+        $this->getJson($this->url("/evenementen/{$evenement->id}/tickets"))->assertJsonPath('tickets.1.beschikbaar', 5);
+        $this->postJson($url, ['tickets' => [['id' => $weekend->id, 'aantal' => 5]]])->assertOk()->assertJsonPath('tickets.1.beschikbaar', 0);
+
+        // Adding to an onbeperkt type, or to a type of another evenement, isn't possible.
+        try {
+            $service->voegCapaciteitToe($evenement->id, $dag->id, 5);
+            $this->fail('An onbeperkt ticket type got capaciteit.');
+        } catch (\DomainException) {
+            $this->assertNull($dag->fresh()->capaciteit);
+        }
+        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        $service->voegCapaciteitToe($this->evenement(['heeft_tickets' => true])->id, $weekend->id, 5);
+    }
+
     public function test_tickets_voor_vrienden_kopen_en_accepteren(): void
     {
         config(['lagapay.test_betalingen' => true]);
@@ -1070,8 +1131,8 @@ class MobielApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('evenement.id', $metTicket->id)
             ->assertJsonPath('tickets', [
-                ['id' => $dagticket->id, 'naam' => 'Dagticket', 'prijs' => '25.00', 'munten' => null, 'gekocht' => true, 'aantal_gekocht' => 1],
-                ['id' => $gekocht->id, 'naam' => 'Weekend', 'prijs' => '40.00', 'munten' => 5, 'gekocht' => true, 'aantal_gekocht' => 2],
+                ['id' => $dagticket->id, 'naam' => 'Dagticket', 'prijs' => '25.00', 'munten' => null, 'gekocht' => true, 'aantal_gekocht' => 1, 'beschikbaar' => null],
+                ['id' => $gekocht->id, 'naam' => 'Weekend', 'prijs' => '40.00', 'munten' => 5, 'gekocht' => true, 'aantal_gekocht' => 2, 'beschikbaar' => null],
             ])
             ->assertJsonPath('deelname', ['is_deelnemer' => true, 'heeft_ticket' => true, 'ticket_gescand' => true, 'gestart' => true, 'kan_deelnemen' => false]);
 

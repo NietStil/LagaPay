@@ -59,6 +59,7 @@ Route::middleware('auth')->group(function () {
                 Route::post('/deelnemers/{gebruiker_id}/kick-groepen', [DeelnemersController::class, 'DeelnemerUitGroep'])->name('deelnemers.kick-groepen');
 
                 Route::post('/tickets', [TicketsController::class, 'create'])->name('ticket.add');
+                Route::post('/tickets/{id}/capaciteit', [TicketsController::class, 'capaciteitToevoegen'])->name('ticket.capaciteit');
                 Route::delete('/tickets/{id}', [TicketsController::class, 'delete'])->name('ticket.destroy');
             });
         })->name('evenementen.');

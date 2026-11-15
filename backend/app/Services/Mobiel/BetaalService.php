@@ -8,6 +8,7 @@ use App\Models\GekochtTicket;
 use App\Models\Opwaardering;
 use App\Models\Ticket;
 use App\Models\TicketUitnodiging;
+use App\Services\Mobiel\Exceptions\TicketsUitverkocht;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -67,7 +68,11 @@ class BetaalService {
      * being mine. Every ticket is its own row with its own QR code. The included munten go to the holder once
      * they are a deelnemer, so none are credited for tickets on offer.
      *
+     * A ticket type with a capaciteit sells at most that many (counted under a lock, so two buyers can't both get
+     * the last ones).
+     *
      * @throws \DomainException test betalingen off, evenement gesloten or without tickets
+     * @throws TicketsUitverkocht more tickets asked than are left of a type
      * @throws ModelNotFoundException a ticket that isn't of this evenement
      */
     public function koopTickets(Gebruiker $gebruiker, Evenement $evenement, array $bestelling): void {
@@ -87,6 +92,17 @@ class BetaalService {
         }
 
         DB::transaction(function () use ($gebruiker, $evenement, $bestelling, $tickets) {
+            // Lock the ticket types (in id order, so concurrent orders can't deadlock) before counting what's left.
+            $vergrendeld = Ticket::whereIn('id', array_keys($bestelling))->orderBy('id')->lockForUpdate()->get();
+
+            foreach ($vergrendeld as $ticket) {
+                $over = $ticket->beschikbaar();
+
+                if ($over !== null && $bestelling[$ticket->id]['aantal'] > $over) {
+                    throw TicketsUitverkocht::voor($ticket->naam, $over);
+                }
+            }
+
             $voorVrienden = 0;
 
             foreach ($bestelling as $ticketId => $regel) {
