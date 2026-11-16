@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
 use Laravel\Socialite\Facades\Socialite;
 
@@ -102,16 +103,76 @@ class SocialiteController extends Controller
 
     /*
     |--------------------------------------------------------------------------
+    | Website (main domain): session based, for buying tickets without the app
+    |--------------------------------------------------------------------------
+    | Runs on the same host as the shared callback, so it's handled there instead of forwarded. Its state
+    | is encrypted JSON ({flow: web, nonce}) so the callback can tell it apart from the app's (an encrypted
+    | deep link) and the dashboard's (Socialite's random string). The nonce, kept in the session, stands in
+    | for Socialite's own state check against login CSRF.
+    */
+
+    public function redirectToWebGoogle(Request $request)
+    {
+        $nonce = Str::random(40);
+        $request->session()->put('google_web_nonce', $nonce);
+
+        return Socialite::driver('google')
+            ->stateless()
+            ->with(['state' => Crypt::encryptString(json_encode(['flow' => 'web', 'nonce' => $nonce]))])
+            ->redirect();
+    }
+
+    private function handleWebGoogleCallback(Request $request, string $nonce)
+    {
+        $verwacht = $request->session()->pull('google_web_nonce');
+
+        try {
+            if (! is_string($verwacht) || ! hash_equals($verwacht, $nonce)) {
+                throw new \RuntimeException('Google state hoort niet bij deze sessie.');
+            }
+
+            $user = $this->gebruikerVoorGoogle(Socialite::driver('google')->stateless()->user());
+        } catch (\Exception $e) {
+            return redirect()->route('web.login')->withErrors([
+                'email' => 'Inloggen via Google is mislukt. Probeer het opnieuw.',
+            ]);
+        }
+
+        Auth::login($user, remember: true);
+        $request->session()->regenerate();
+
+        // Back to the tickets page that sent me to log in, like the email login.
+        return redirect()->intended(route('landing'));
+    }
+
+    /** The website's nonce when the state is one of its own ({flow: web}), otherwise null. */
+    private function webNonce(?string $state): ?string
+    {
+        $data = $state !== null ? json_decode($state, true) : null;
+
+        return is_array($data) && ($data['flow'] ?? null) === 'web' && is_string($data['nonce'] ?? null)
+            ? $data['nonce']
+            : null;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Shared callback (main domain)
     |--------------------------------------------------------------------------
-    | Google only accepts the main domain as redirect URI (it rejects *.localhost), so both flows
-    | use it. Forward to the subdomain that started the login: the app's state is encrypted by us,
-    | the dashboard's state is Socialite's random session state.
+    | Google only accepts the main domain as redirect URI (it rejects *.localhost), so every flow uses it.
+    | The website's own login is handled right here; the others are forwarded to the subdomain that started
+    | them: the app's state is an encrypted deep link, the dashboard's state is Socialite's random string.
     */
 
     public function forwardGoogleCallback(Request $request)
     {
-        $subdomein = $this->ontsleutelState($request->query('state')) !== null ? 'api' : 'organisator';
+        $state = $this->ontsleutelState($request->query('state'));
+
+        if (($nonce = $this->webNonce($state)) !== null) {
+            return $this->handleWebGoogleCallback($request, $nonce);
+        }
+
+        $subdomein = $state !== null ? 'api' : 'organisator';
 
         $app = parse_url(config('app.url'));
         $url = $app['scheme'] . '://' . $subdomein . '.' . $app['host']

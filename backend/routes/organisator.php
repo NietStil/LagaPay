@@ -11,7 +11,9 @@ use App\Http\Controllers\Dashboard\TicketsController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Auth\SocialiteController;
 use App\Http\Controllers\Dashboard\DashboardController;
+use App\Http\Middleware\EvenementOrganisator;
 use App\Http\Middleware\HeeftWebToegang;
+use App\Http\Middleware\StuurOrganisatorNaarDashboard;
 
 /*
 |--------------------------------------------------------------------------
@@ -20,7 +22,7 @@ use App\Http\Middleware\HeeftWebToegang;
 | The dashboard for organisatoren. Registered in bootstrap/app.php with the web middleware.
 */
 
-Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::get('/', [HomeController::class, 'organiserPage'])->middleware(StuurOrganisatorNaarDashboard::class)->name('home');
 
 // Routes for guests only (unauthenticated users)
 Route::middleware('guest')->group(function () {
@@ -30,8 +32,8 @@ Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'index'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:6,1')->name('login.perform');
 
-    Route::get('/auth/google', [SocialiteController::class, 'redirectToGoogle'])->name('google.login');
-    Route::get('/auth/google/callback', [SocialiteController::class, 'handleGoogleCallback'])->name('google.callback');
+//    Route::get('/auth/google', [SocialiteController::class, 'redirectToGoogle'])->name('google.login');
+//    Route::get('/auth/google/callback', [SocialiteController::class, 'handleGoogleCallback'])->name('google.callback');
 });
 
 // Routes for authenticated users
@@ -42,10 +44,12 @@ Route::middleware('auth')->group(function () {
         Route::prefix('dashboard/evenementen')->group(function () {
             Route::get('/', [DashboardController::class, 'index'])->name('evenementen');
             Route::post('/', [EvenementController::class, 'create'])->name('store');
-            Route::get('/{id}', [EvenementController::class, 'show'])->name('show');
-            Route::delete('/{id}', [EvenementController::class, 'destroy'])->name('destroy');
+            Route::middleware(EvenementOrganisator::class)->group(function () {
+                Route::get('/{id}', [EvenementController::class, 'show'])->name('show');
+                Route::delete('/{id}', [EvenementController::class, 'destroy'])->name('destroy');
+            });
 
-            Route::prefix('/{evenement_id}')->group(function () {
+            Route::prefix('/{evenement_id}')->middleware(EvenementOrganisator::class)->group(function () {
                 Route::post('/categorieen', [ProductenController::class, 'createCategorie'])->name('categorie.store');
                 Route::put('/categorieen/{id}', [ProductenController::class, 'updateCategorie'])->name('categorie.update');
                 Route::delete('/categorieen/{id}', [ProductenController::class, 'deleteCategorie'])->name('categorie.destroy');

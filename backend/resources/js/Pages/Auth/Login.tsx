@@ -1,7 +1,15 @@
 import React, { useState } from 'react';
 import { router, usePage } from '@inertiajs/react';
+import GoogleKnop from '../../Components/Auth/GoogleKnop';
 
-export default function Login() {
+interface LoginProps {
+    /** Main domain (buying tickets): a different subtitle, Google login and a link to register. Unset on organisator.* */
+    ondertitel?: string;
+    registrerenUrl?: string;
+    googleUrl?: string;
+}
+
+export default function Login({ ondertitel, registrerenUrl, googleUrl }: LoginProps) {
     const { errors } = usePage().props as { errors: Record<string, string> };
 
     const [email, setEmail] = useState('');
@@ -36,7 +44,7 @@ export default function Login() {
                         </svg>
                     </div>
                     <h1 className="text-2xl font-bold text-white tracking-tight">Welkom Terug</h1>
-                    <p className="text-zinc-400 mt-1.5 text-sm">Vul je gegevens in om in te loggen op LagaPay</p>
+                    <p className="text-zinc-400 mt-1.5 text-sm">{ondertitel ?? 'Vul je gegevens in om in te loggen op LagaPay'}</p>
                 </div>
 
                 {/* Card Container */}
@@ -186,6 +194,17 @@ export default function Login() {
                     {/*    </svg>*/}
                     {/*    <span className="group-hover:text-white transition-colors">Inloggen met Google</span>*/}
                     {/*</a>*/}
+
+                    {googleUrl && <GoogleKnop href={googleUrl} />}
+
+                    {registrerenUrl && (
+                        <p className="text-center text-sm text-zinc-400 mt-8">
+                            Nog geen account?{' '}
+                            <a href={registrerenUrl} className="font-semibold text-purple-400 hover:text-purple-300 transition-colors">
+                                Registreren
+                            </a>
+                        </p>
+                    )}
 
                     {/*/!* Footer Register Link *!/*/}
                     {/*<p className="text-center text-sm text-zinc-400 mt-8">*/}

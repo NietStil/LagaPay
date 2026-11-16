@@ -27,6 +27,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
         ]);
+
+        // The main domain (ticket buyers) and organisator.* each have their own login page and home.
+        $hoofddomein = fn (Request $request) => $request->getHost() === parse_url(config('app.url'), PHP_URL_HOST);
+        $middleware->redirectGuestsTo(fn (Request $request) => route($hoofddomein($request) ? 'web.login' : 'login'));
+        $middleware->redirectUsersTo(fn (Request $request) => route($hoofddomein($request) ? 'landing' : 'home'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

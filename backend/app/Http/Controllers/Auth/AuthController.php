@@ -3,10 +3,9 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\Gebruiker;
+use App\Http\Requests\InloggenRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class AuthController extends Controller
@@ -16,24 +15,22 @@ class AuthController extends Controller
         return Inertia::render('Auth/Login');
     }
 
-    public function login(Request $request)
+    public function login(InloggenRequest $request)
     {
-        $credentials = $request->validate([
-            'email'      => ['required', 'string', 'email'],
-            'wachtwoord' => ['required', 'string'],
-        ]);
+        $gebruiker = $request->inloggen();
 
-        $email = strtolower(trim($credentials['email']));
+        // Correct password, but a normal account: log straight out again and answer 401 on the login page.
+        if (! $gebruiker->heeftWebToegang()) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
 
-        if (Auth::attempt(['email' => $email, 'password' => $credentials['wachtwoord']], $request->boolean('remember'))) {
-            $request->session()->regenerate();
-
-            return redirect()->intended('/dashboard/evenementen');
+            return Inertia::render('Auth/Login', [
+                'errors' => ['email' => 'Dit account heeft geen toegang tot het organisatordashboard.'],
+            ])->toResponse($request)->setStatusCode(401);
         }
 
-        return back()->withErrors([
-            'email' => 'De opgegeven inloggegevens zijn onjuist.',
-        ])->onlyInput('email');
+        return redirect()->intended('/dashboard/evenementen');
     }
 
     public function destroy(Request $request)
@@ -46,22 +43,12 @@ class AuthController extends Controller
         return redirect('/');
     }
 
-    public function mobileLogin(Request $request) {
+    public function mobileLogin(InloggenRequest $request) {
         $credentials = $request->validate([
-            'email'       => ['required', 'string', 'email'],
-            'wachtwoord'  => ['required', 'string'],
             'device_name' => ['required', 'string'],
         ]);
 
-        $email = strtolower(trim($credentials['email']));
-
-        if (! Auth::validate(['email' => $email, 'password' => $credentials['wachtwoord']])) {
-            throw ValidationException::withMessages([
-                'email' => ['De opgegeven inloggegevens zijn onjuist.'],
-            ]);
-        }
-
-        $gebruiker = Gebruiker::where('email', $email)->first();
+        $gebruiker = $request->gebruiker();
 
         $token = $gebruiker->createToken($credentials['device_name']);
 

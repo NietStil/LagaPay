@@ -1,9 +1,5 @@
 import { Head } from '@inertiajs/react';
-
-interface LandingProps {
-    /** The dashboard on the organisator subdomain. */
-    organisatorUrl: string;
-}
+import { WebHeader } from '../Components/Web/WebLayout';
 
 const STAPPEN = [
     {
@@ -21,22 +17,12 @@ const STAPPEN = [
 ];
 
 /** Public landing page on the main domain. */
-export default function Landing({ organisatorUrl }: LandingProps) {
+export default function Landing() {
     return (
         <div className="min-h-screen bg-zinc-950 flex flex-col font-sans text-zinc-100 selection:bg-purple-900 selection:text-white">
             <Head title="Betalen op evenementen" />
 
-            <header className="w-full border-b border-zinc-800/80 px-4 sm:px-6 h-16 flex items-center justify-between">
-                <span className="font-bold text-lg tracking-tight text-white select-none">
-                    Laga<span className="text-purple-400">Pay</span>
-                </span>
-                <a
-                    href={organisatorUrl}
-                    className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold text-sm transition-colors border border-zinc-700/60"
-                >
-                    Voor organisatoren
-                </a>
-            </header>
+            <WebHeader />
 
             <main className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-16">
                 <div className="text-center max-w-2xl">
