@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
-import apiClient, { WEB_URL, tokenStorage } from '@/lib/api/client';
+import apiClient, { DOMAIN, tokenStorage } from '@/lib/api/client';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -111,10 +111,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loginWithGoogle = async () => {
-    // Web OAuth flow (the redirect URI registered with Google); the backend
-    // sends the Sanctum token back to `redirectUrl` as a query parameter.
+    // OAuth flow on the api.* subdomain; the backend sends the Sanctum token
+    // back to `redirectUrl` as a query parameter.
     const redirectUrl = Linking.createURL('login');
-    const googleAuthUrl = `${WEB_URL}/auth/google?app_redirect=${encodeURIComponent(redirectUrl)}`;
+    const googleAuthUrl = `${DOMAIN}/auth/google?app_redirect=${encodeURIComponent(redirectUrl)}`;
 
     const result = await WebBrowser.openAuthSessionAsync(googleAuthUrl, redirectUrl);
 

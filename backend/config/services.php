@@ -31,6 +31,8 @@ return [
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        // One callback on the main domain for both flows (Google rejects *.localhost), which
+        // forwards to api.* or organisator.*, see SocialiteController::forwardGoogleCallback().
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 

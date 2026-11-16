@@ -27,9 +27,9 @@ Route::middleware('guest')->group(function () {
 
     Route::post('/register', [RegisterController::class, 'mobileRegister'])->name('register.mobile.perform');
 
-    Route::get('/auth/google', [SocialiteController::class, 'redirectToMobileGoogle'])->name('google.login');
-    Route::get('/auth/google/callback', [SocialiteController::class, 'handleMobileGoogleCallback'])->name('google.callback');
-    Route::post('/auth/google/token', [SocialiteController::class, 'handleGoogleToken'])->name('google.token');
+    Route::get('/auth/google', [SocialiteController::class, 'redirectToMobileGoogle'])->name('google.mobile.login');
+    Route::get('/auth/google/callback', [SocialiteController::class, 'handleMobileGoogleCallback'])->name('google.mobile.callback');
+    Route::post('/auth/google/token', [SocialiteController::class, 'handleGoogleToken'])->name('google.mobile.token');
 });
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {

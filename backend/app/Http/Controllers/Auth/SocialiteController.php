@@ -4,26 +4,123 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\Gebruiker;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
+use Laravel\Socialite\Contracts\User as SocialiteUser;
 use Laravel\Socialite\Facades\Socialite;
 
 class SocialiteController extends Controller
 {
-    public function redirectToGoogle(Request $request)
-    {
-        // The mobile app opens this web flow with ?app_redirect=<deep link>.
-        // Remember it in the session so the callback can hand back an API token.
-        $appRedirect = $request->query('app_redirect');
+    private const MOBIEL_FOUT = 'Inloggen via Google is mislukt.';
 
-        if (is_string($appRedirect) && $this->isAllowedAppRedirect($appRedirect)) {
-            $request->session()->put('google_app_redirect', $appRedirect);
-        } else {
-            $request->session()->forget('google_app_redirect');
+    /*
+    |--------------------------------------------------------------------------
+    | Organisator dashboard (organisator.*): session based web login
+    |--------------------------------------------------------------------------
+    */
+
+    public function redirectToGoogle()
+    {
+        return Socialite::driver('google')->redirect();
+    }
+
+    public function handleGoogleCallback(Request $request)
+    {
+        try {
+            $user = $this->gebruikerVoorGoogle(Socialite::driver('google')->user());
+        } catch (\Exception $e) {
+            return redirect('/login')->withErrors([
+                'email' => 'Inloggen via Google is mislukt. Probeer het opnieuw.',
+            ]);
         }
 
-        return Socialite::driver('google')->redirect();
+        Auth::login($user);
+        $request->session()->regenerate();
+
+        return redirect('/dashboard/evenementen');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Mobile app (api.*): stateless, returns a Sanctum token via deep link
+    |--------------------------------------------------------------------------
+    | The app opens /auth/google?app_redirect=<deep link>. There is no session on the API, so the
+    | deep link travels through Google inside an encrypted `state` and comes back on the callback.
+    */
+
+    public function redirectToMobileGoogle(Request $request)
+    {
+        $appRedirect = $request->query('app_redirect');
+
+        if (!is_string($appRedirect) || !$this->isAllowedAppRedirect($appRedirect)) {
+            $appRedirect = 'lagapay://login';
+        }
+
+        return $this->mobielDriver()
+            ->with(['state' => Crypt::encryptString($appRedirect)])
+            ->redirect();
+    }
+
+    public function handleMobileGoogleCallback(Request $request)
+    {
+        $appRedirect = $this->appRedirectUitState($request->query('state'));
+
+        try {
+            $user = $this->gebruikerVoorGoogle($this->mobielDriver()->user());
+        } catch (\Exception $e) {
+            return redirect()->away($this->appRedirectUrl($appRedirect, ['error' => self::MOBIEL_FOUT]));
+        }
+
+        $token = $user->createToken('expo-mobile-app')->plainTextToken;
+
+        return redirect()->away($this->appRedirectUrl($appRedirect, ['token' => $token]));
+    }
+
+    private function mobielDriver()
+    {
+        return Socialite::driver('google')->stateless();
+    }
+
+    private function appRedirectUitState(mixed $state): string
+    {
+        $url = $this->ontsleutelState($state);
+
+        return $url && $this->isAllowedAppRedirect($url) ? $url : 'lagapay://login';
+    }
+
+    private function ontsleutelState(mixed $state): ?string
+    {
+        try {
+            return is_string($state) ? Crypt::decryptString($state) : null;
+        } catch (DecryptException) {
+            return null;
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Shared callback (main domain)
+    |--------------------------------------------------------------------------
+    | Google only accepts the main domain as redirect URI (it rejects *.localhost), so both flows
+    | use it. Forward to the subdomain that started the login: the app's state is encrypted by us,
+    | the dashboard's state is Socialite's random session state.
+    */
+
+    public function forwardGoogleCallback(Request $request)
+    {
+        $subdomein = $this->ontsleutelState($request->query('state')) !== null ? 'api' : 'organisator';
+
+        $app = parse_url(config('app.url'));
+        $url = $app['scheme'] . '://' . $subdomein . '.' . $app['host']
+            . (isset($app['port']) ? ':' . $app['port'] : '')
+            . '/auth/google/callback';
+
+        $query = $request->getQueryString();
+
+        return redirect()->away($query ? $url . '?' . $query : $url);
     }
 
     /**
@@ -53,95 +150,28 @@ class SocialiteController extends Controller
         return $base . (str_contains($base, '?') ? '&' : '?') . http_build_query($query);
     }
 
-    public function handleGoogleCallback(Request $request)
+    private function gebruikerVoorGoogle(SocialiteUser $googleUser): Gebruiker
     {
-        $appRedirect = $request->session()->pull('google_app_redirect');
+        $email = strtolower(trim($googleUser->getEmail()));
 
-        try {
-            $googleUser = Socialite::driver('google')->user();
-            $email = strtolower(trim($googleUser->email));
+        $user = Gebruiker::where('google_id', $googleUser->getId())
+            ->orWhere('email', $email)
+            ->first();
 
-            $user = Gebruiker::where('google_id', $googleUser->id)
-                ->orWhere('email', $email)
-                ->first();
-
-            if ($user) {
-                if (!$user->google_id) {
-                    $user->update(['google_id' => $googleUser->id]);
-                }
-            } else {
-                $user = Gebruiker::create([
-                    'voornaam'   => $googleUser->user['given_name'] ?? $googleUser->name ?? '',
-                    'achternaam' => $googleUser->user['family_name'] ?? '',
-                    'email'      => $email,
-                    'google_id'  => $googleUser->id,
-                ]);
+        if ($user) {
+            if (!$user->google_id) {
+                $user->update(['google_id' => $googleUser->getId()]);
             }
 
-            // Request came from the mobile app: return a Sanctum token via deep link.
-            if ($appRedirect) {
-                $token = $user->createToken('expo-mobile-app')->plainTextToken;
-
-                return redirect()->away($this->appRedirectUrl($appRedirect, ['token' => $token]));
-            }
-
-            Auth::login($user);
-            $request->session()->regenerate();
-
-            return redirect('/dashboard/evenementen');
-        } catch (\Exception $e) {
-            if ($appRedirect) {
-                return redirect()->away($this->appRedirectUrl($appRedirect, [
-                    'error' => 'Inloggen via Google is mislukt.',
-                ]));
-            }
-
-            return redirect('/login')->withErrors([
-                'email' => 'Inloggen via Google is mislukt. Probeer het opnieuw.',
-            ]);
+            return $user;
         }
-    }
 
-    public function redirectToMobileGoogle()
-    {
-        return Socialite::driver('google')
-            ->stateless()
-            ->redirect();
-    }
-
-    public function handleMobileGoogleCallback(Request $request)
-    {
-        try {
-            // Use stateless() for mobile apps since they don't use cookies/sessions
-            $googleUser = Socialite::driver('google')->stateless()->user();
-            $email = strtolower(trim($googleUser->email));
-
-            $user = Gebruiker::where('google_id', $googleUser->id)
-                ->orWhere('email', $email)
-                ->first();
-
-            if ($user) {
-                if (!$user->google_id) {
-                    $user->update(['google_id' => $googleUser->id]);
-                }
-            } else {
-                $user = Gebruiker::create([
-                    'voornaam'   => $googleUser->user['given_name'] ?? $googleUser->name ?? '',
-                    'achternaam' => $googleUser->user['family_name'] ?? '',
-                    'email'      => $email,
-                    'google_id'  => $googleUser->id,
-                ]);
-            }
-
-            // Generate a Laravel Sanctum API token for mobile
-            $token = $user->createToken('expo-mobile-app')->plainTextToken;
-
-            // Redirect back to your mobile app via deep link
-            return redirect("lagapay://login?token={$token}");
-
-        } catch (\Exception $e) {
-            return redirect("lagapay://login?error=" . urlencode('Inloggen via Google is mislukt.'));
-        }
+        return Gebruiker::create([
+            'voornaam'   => $googleUser->user['given_name'] ?? $googleUser->getName() ?? '',
+            'achternaam' => $googleUser->user['family_name'] ?? '',
+            'email'      => $email,
+            'google_id'  => $googleUser->getId(),
+        ]);
     }
 
     public function handleGoogleToken(Request $request)

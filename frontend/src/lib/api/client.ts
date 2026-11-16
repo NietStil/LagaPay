@@ -33,12 +33,9 @@ if (Platform.OS === 'android' && !Device.isDevice && IS_LOCAL) {
 
 const DOMAIN = new URL(BASE_URL).origin;
 
-// Main (web) domain without the "api." subdomain. The Google OAuth flow must run here,
-// because this is where Google's redirect URI is registered and where the session lives.
-const WEB_URL = DOMAIN.replace('://api.', '://');
 const ASSET_URL = IS_LOCAL ? 'http://lagapay.test:1510' : 'https://lagapay.nl';
 
-export { BASE_URL, DOMAIN, WEB_URL, ASSET_URL, IS_LOCAL };
+export { BASE_URL, DOMAIN, ASSET_URL, IS_LOCAL };
 
 // Token storage (AsyncStorage works on iOS, Android and web; localStorage alone does nothing on native)
 export const tokenStorage = {
