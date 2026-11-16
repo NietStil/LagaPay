@@ -14,6 +14,11 @@ export default function Tickets({ evenement }: SelectedEvenementProps) {
     const [formNaam, setFormNaam] = useState('');
     const [formPrijs, setFormPrijs] = useState('');
     const [formMunten, setFormMunten] = useState('');
+    const [formCapaciteit, setFormCapaciteit] = useState('');
+
+    // "Tickets toevoegen": the ticket type whose capaciteit is being raised, and by how many
+    const [toevoegenTicket, setToevoegenTicket] = useState<Ticket | null>(null);
+    const [formExtra, setFormExtra] = useState('');
 
     const tickets: Ticket[] = evenement.tickets || [];
 
@@ -24,6 +29,7 @@ export default function Tickets({ evenement }: SelectedEvenementProps) {
             naam: formNaam.trim(),
             prijs: formPrijs === '' ? 0 : Number(formPrijs),
             munten: formMunten === '' ? 0 : Number(formMunten),
+            capaciteit: formCapaciteit === '' ? null : Number(formCapaciteit),
         }, {
             preserveScroll: true,
             onSuccess: () => {
@@ -31,6 +37,20 @@ export default function Tickets({ evenement }: SelectedEvenementProps) {
                 setFormNaam('');
                 setFormPrijs('');
                 setFormMunten('');
+                setFormCapaciteit('');
+            }
+        });
+    };
+
+    const handleCapaciteitToevoegen = () => {
+        const extra = Number(formExtra);
+        if (!toevoegenTicket || !Number.isInteger(extra) || extra < 1) return;
+
+        router.post(`/dashboard/evenementen/${evenement.id}/tickets/${toevoegenTicket.id}/capaciteit`, { extra }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setToevoegenTicket(null);
+                setFormExtra('');
             }
         });
     };
@@ -143,9 +163,38 @@ export default function Tickets({ evenement }: SelectedEvenementProps) {
                                         )}
 
                                         <div className={`flex items-center justify-between text-sm ${hasMunten ? 'pt-3 border-t border-zinc-800/80' : ''}`}>
-                                            <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Gekoppelde bezoekers</span>
-                                            <span className="text-sm font-black text-white">{userCount}</span>
+                                            <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Verkocht</span>
+                                            <span className="text-sm font-black text-white">
+                                                {ticket.capaciteit === null ? (
+                                                    <>{userCount} <span className="font-semibold text-zinc-500">· onbeperkt</span></>
+                                                ) : (
+                                                    <>{userCount} <span className="font-semibold text-zinc-500">/ {ticket.capaciteit}</span></>
+                                                )}
+                                            </span>
                                         </div>
+
+                                        {ticket.capaciteit !== null && (
+                                            <div className="flex items-center justify-between gap-3 pt-3 border-t border-zinc-800/80">
+                                                {userCount >= ticket.capaciteit ? (
+                                                    <span className="px-2.5 py-1 rounded-lg bg-red-950/60 text-red-300 border border-red-900/60 font-bold text-xs">
+                                                        Uitverkocht
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-zinc-400">
+                                                        Nog <span className="font-bold text-white">{ticket.capaciteit - userCount}</span> beschikbaar
+                                                    </span>
+                                                )}
+                                                <button
+                                                    onClick={() => { setToevoegenTicket(ticket); setFormExtra(''); }}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold text-xs transition-colors border border-zinc-700/60"
+                                                >
+                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                                    </svg>
+                                                    Tickets toevoegen
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             );
@@ -209,6 +258,22 @@ export default function Tickets({ evenement }: SelectedEvenementProps) {
                                         />
                                     </div>
                                 </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                                        Aantal tickets (Optioneel)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        step={1}
+                                        value={formCapaciteit}
+                                        onChange={(e) => setFormCapaciteit(e.target.value)}
+                                        placeholder="Leeg = onbeperkt"
+                                        className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white focus:outline-none focus:border-purple-500"
+                                    />
+                                    <p className="text-xs text-zinc-500">Hoeveel er in totaal verkocht mogen worden. Je kunt later tickets toevoegen.</p>
+                                </div>
                             </div>
 
                             <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-800">
@@ -223,6 +288,59 @@ export default function Tickets({ evenement }: SelectedEvenementProps) {
                                     className="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-semibold text-xs"
                                 >
                                     Opslaan
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Tickets toevoegen Modal */}
+                {toevoegenTicket && toevoegenTicket.capaciteit !== null && (
+                    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+                        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
+                            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+                                <h3 className="text-lg font-bold text-white">Tickets toevoegen &mdash; {toevoegenTicket.naam}</h3>
+                                <button
+                                    onClick={() => setToevoegenTicket(null)}
+                                    className="text-zinc-400 hover:text-white p-1 rounded-lg bg-zinc-800"
+                                >
+                                    &times;
+                                </button>
+                            </div>
+
+                            <div className="space-y-1.5 text-sm">
+                                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                                    Hoeveel extra tickets
+                                </label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    step={1}
+                                    autoFocus
+                                    value={formExtra}
+                                    onChange={(e) => setFormExtra(e.target.value)}
+                                    placeholder="Bijv. 50"
+                                    className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white focus:outline-none focus:border-purple-500"
+                                />
+                                <p className="text-xs text-zinc-500">
+                                    Nu {toevoegenTicket.capaciteit} in totaal
+                                    {Number(formExtra) > 0 ? `, daarna ${toevoegenTicket.capaciteit + Number(formExtra)}` : ''}.
+                                </p>
+                            </div>
+
+                            <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-800">
+                                <button
+                                    onClick={() => setToevoegenTicket(null)}
+                                    className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold text-xs"
+                                >
+                                    Annuleren
+                                </button>
+                                <button
+                                    onClick={handleCapaciteitToevoegen}
+                                    disabled={!(Number.isInteger(Number(formExtra)) && Number(formExtra) >= 1)}
+                                    className="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 disabled:opacity-50 disabled:hover:bg-purple-700 text-white font-semibold text-xs"
+                                >
+                                    Toevoegen
                                 </button>
                             </div>
                         </div>

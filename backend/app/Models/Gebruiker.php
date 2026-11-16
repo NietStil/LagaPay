@@ -35,6 +35,12 @@ class Gebruiker extends Authenticatable
         return $this->wachtwoord;
     }
 
+    /** Only organisatoren and admins may use the organisator dashboard. */
+    public function heeftWebToegang(): bool
+    {
+        return in_array($this->rol, ['organizator', 'admin'], true);
+    }
+
     public function getNameAttribute(): string
     {
         $parts = array_filter([$this->voornaam, $this->tussenvoegsels, $this->achternaam]);

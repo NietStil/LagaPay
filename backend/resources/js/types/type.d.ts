@@ -105,6 +105,8 @@ export interface Ticket {
     prijs: number;
     naam: string;
     munten: null | number;
+    /** Maximum number of tickets of this type for sale; null = onbeperkt. */
+    capaciteit: null | number;
     gebruikers_count?: number;
     gebruikers?: Gebruiker[];
 }

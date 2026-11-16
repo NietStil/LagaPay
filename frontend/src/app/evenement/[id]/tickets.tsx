@@ -33,6 +33,11 @@ import { meld } from '@/lib/melding';
 
 /** Per ticket type per order (the backend allows 1–10). */
 const MAX_PER_SOORT = 10;
+/** From this many left, the card says "Nog X over". */
+const BIJNA_UITVERKOCHT = 10;
+
+/** Most I can pick of a type: MAX_PER_SOORT, or fewer when not that many are left. */
+const maxVoor = (ticket: TicketType) => Math.min(MAX_PER_SOORT, ticket.beschikbaar ?? MAX_PER_SOORT);
 
 type TicketsResultaat = { soort: 'ok'; data: EvenementTickets } | { soort: 'geweigerd'; melding: string };
 
@@ -95,11 +100,13 @@ export default function TicketsKopenScreen() {
     );
   }
 
-  // Default: one of the cheapest ticket (the list is prijs ascending) while I have none yet.
+  // Default: one of the cheapest ticket that isn't uitverkocht (the list is prijs ascending) while I have none yet.
+  const eersteTeKoop = tickets.find((t) => t.beschikbaar !== 0);
   const gekozen: Record<number, number> =
-    aantallen ?? (deelname.heeft_ticket || !evenement.open ? {} : { [tickets[0].id]: 1 });
+    aantallen ?? (deelname.heeft_ticket || !evenement.open || !eersteTeKoop ? {} : { [eersteTeKoop.id]: 1 });
   const zetAantal = (ticketId: number, n: number) => {
-    const nieuw = Math.max(0, Math.min(MAX_PER_SOORT, n));
+    const ticket = tickets.find((t) => t.id === ticketId);
+    const nieuw = Math.max(0, Math.min(ticket ? maxVoor(ticket) : MAX_PER_SOORT, n));
     setAantallen({ ...gekozen, [ticketId]: nieuw });
     // Never more for friends than bought.
     if ((voorVrienden[ticketId] ?? 0) > nieuw) setVoorVrienden({ ...voorVrienden, [ticketId]: nieuw });
@@ -132,6 +139,9 @@ export default function TicketsKopenScreen() {
       router.push(`/evenement/${id}/mijn-tickets`);
     } catch (err) {
       setFout(foutmelding(err, 'Afrekenen lukt niet. Probeer het opnieuw.'));
+      // E.g. 409 (sold out meanwhile): show the current numbers left, with my choice capped to them.
+      reload();
+      setAantallen(null);
     } finally {
       setBezig(false);
     }
@@ -191,7 +201,7 @@ export default function TicketsKopenScreen() {
             key={ticket.id}
             ticket={ticket}
             aantal={gekozen[ticket.id] ?? 0}
-            onAantal={evenement.open ? (n) => zetAantal(ticket.id, n) : undefined}
+            onAantal={evenement.open && ticket.beschikbaar !== 0 ? (n) => zetAantal(ticket.id, n) : undefined}
             voorVrienden={voorVrienden[ticket.id] ?? 0}
             onVoorVrienden={evenement.open ? (n) => zetVoorVrienden(ticket.id, n) : undefined}
           />
@@ -298,8 +308,13 @@ function TicketKaart({ ticket, aantal, onAantal, voorVrienden, onVoorVrienden }:
               <Text className="text-[13px] font-semibold text-emerald-300">Je hebt er {ticket.aantal_gekocht}</Text>
             </View>
           ) : null}
+          {ticket.beschikbaar === 0 ? (
+            <Pill label="Uitverkocht" tone="neutral" />
+          ) : ticket.beschikbaar !== null && ticket.beschikbaar <= BIJNA_UITVERKOCHT ? (
+            <Text className="text-[13px] font-semibold text-amber-300">Nog {ticket.beschikbaar} over</Text>
+          ) : null}
         </View>
-        {onAantal ? <Teller naam={ticket.naam} aantal={aantal} onAantal={onAantal} /> : null}
+        {onAantal ? <Teller naam={ticket.naam} aantal={aantal} onAantal={onAantal} max={maxVoor(ticket)} /> : null}
       </View>
       {/* Only once at least one is chosen: how many of those are for friends. */}
       {onVoorVrienden && aantal > 0 ? (

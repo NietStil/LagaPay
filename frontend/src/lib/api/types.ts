@@ -161,6 +161,8 @@ export interface TicketType {
   gekocht: boolean;
   /** How many tickets of this type I have. */
   aantal_gekocht: number;
+  /** How many are still for sale (0 = uitverkocht); null = onbeperkt. */
+  beschikbaar: number | null;
 }
 
 /** One line of a ticket order: this many of this ticket type. */

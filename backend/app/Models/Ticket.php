@@ -19,6 +19,7 @@ class Ticket extends Model
         'prijs',
         'naam',
         'munten',
+        'capaciteit',
     ];
 
     protected function casts(): array
@@ -26,7 +27,20 @@ class Ticket extends Model
         return [
             'prijs' => 'decimal:2',
             'munten' => 'integer',
+            'capaciteit' => 'integer',
         ];
+    }
+
+    /** How many are still for sale; null = onbeperkt. Pass $verkocht when already counted (e.g. withCount). */
+    public function beschikbaar(?int $verkocht = null): ?int
+    {
+        if ($this->capaciteit === null) {
+            return null;
+        }
+
+        $verkocht ??= $this->gebruikers()->count();
+
+        return max(0, $this->capaciteit - $verkocht);
     }
 
     public function evenement(): BelongsTo

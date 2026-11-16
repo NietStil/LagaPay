@@ -114,7 +114,10 @@ class TicketOverzichtService {
         }
 
         $tickets = Ticket::where('evenement_id', $evenement->id)
-            ->withCount(['gebruikers as aantal_gekocht' => fn (Builder $query) => $query->where('gebruikers.id', $gebruiker->id)])
+            ->withCount([
+                'gebruikers as aantal_gekocht' => fn (Builder $query) => $query->where('gebruikers.id', $gebruiker->id),
+                'gebruikers as aantal_verkocht',
+            ])
             ->orderBy('prijs')
             ->orderBy('id')
             ->get()
@@ -125,6 +128,8 @@ class TicketOverzichtService {
                 'munten'         => $ticket->munten,
                 'gekocht'        => $ticket->aantal_gekocht > 0,
                 'aantal_gekocht' => (int) $ticket->aantal_gekocht,
+                // How many are still for sale (0 = uitverkocht), null = onbeperkt.
+                'beschikbaar'    => $ticket->beschikbaar((int) $ticket->aantal_verkocht),
             ])
             ->all();
 

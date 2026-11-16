@@ -16,6 +16,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | App
+    |--------------------------------------------------------------------------
+    |
+    | How the website opens the app for a link: its URL scheme, and the Android
+    | package (so Chrome falls back to buying tickets online when the app isn't
+    | installed). See frontend/app.json.
+    |
+    */
+
+    'app_scheme' => env('LAGAPAY_APP_SCHEME', 'lagapay'),
+
+    'android_package' => env('LAGAPAY_ANDROID_PACKAGE', 'com.anonymous.lagapay'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Test betalingen
     |--------------------------------------------------------------------------
     |

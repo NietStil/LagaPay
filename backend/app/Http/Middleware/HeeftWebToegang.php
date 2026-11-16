@@ -15,10 +15,15 @@ class HeeftWebToegang
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if ($request->user() && in_array($request->user()->rol, ['organizer', 'admin'])) {
-            return $next($request);
+        if (! $request->user()) {
+            return redirect()->route('login');
         }
 
-        return redirect()->route('login');
+        // Logged in without access: a redirect to /login would loop (guest sends logged-in users back to the dashboard).
+        if (! $request->user()->heeftWebToegang()) {
+            abort(401, 'Dit account heeft geen toegang tot het organisatordashboard.');
+        }
+
+        return $next($request);
     }
 }
