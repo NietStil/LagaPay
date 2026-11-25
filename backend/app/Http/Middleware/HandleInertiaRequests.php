@@ -41,6 +41,8 @@ class HandleInertiaRequests extends Middleware
             ],
             // Base of the join links that the app opens ({link_url}/e/{code}), see config/lagapay.php.
             'link_url' => rtrim((string) config('lagapay.link_url'), '/'),
+            // One-off message after a redirect, e.g. "wachtwoord veranderd" on the login page.
+            'status' => fn () => $request->session()->get('status'),
         ]);
     }
 }

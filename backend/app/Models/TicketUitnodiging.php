@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use Hidehalo\Nanoid\Client;
+use App\Services\CodeService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -35,22 +35,13 @@ class TicketUitnodiging extends Model
     {
         return static::firstOrCreate(
             ['gebruiker_id' => $gebruikerId, 'evenement_id' => $evenementId],
-            ['code' => static::nieuweCode()],
+            // 12 characters, the same alphabet as the other codes.
+            ['code' => CodeService::uniekeCode(static::class, 12)],
         );
     }
 
     public function link(): string
     {
         return rtrim((string) config('lagapay.link_url'), '/') . '/t/' . $this->code;
-    }
-
-    /** 12 nanoid characters ([A-Za-z0-9_-]); the same alphabet as the other codes. */
-    protected static function nieuweCode(): string
-    {
-        do {
-            $code = (new Client())->generateId(12);
-        } while (static::where('code', $code)->exists());
-
-        return $code;
     }
 }

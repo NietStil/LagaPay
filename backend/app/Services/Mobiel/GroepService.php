@@ -9,7 +9,7 @@ use App\Models\Munt;
 use App\Models\Transactie;
 use App\Services\Mobiel\Exceptions\DeelnameGeweigerd;
 use App\Services\Mobiel\Exceptions\GroepConflictException;
-use Hidehalo\Nanoid\Client;
+use App\Services\CodeService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -156,21 +156,13 @@ class GroepService {
             $groep = Groep::create([
                 'naam'         => $naam,
                 'evenement_id' => $evenement->id,
-                'code'         => $this->uniekeCode(),
+                // 10 characters, the same format as the existing groep codes.
+                'code'         => CodeService::uniekeCode(Groep::class, 10),
             ]);
             $groep->gebruikers()->attach($gebruiker->id);
 
             return $groep;
         });
-    }
-
-    /** 10 nanoid characters ([A-Za-z0-9_-]), the same format as the existing groep codes. */
-    protected function uniekeCode(): string {
-        do {
-            $code = (new Client())->generateId(10);
-        } while (Groep::where('code', $code)->exists());
-
-        return $code;
     }
 
     /** Groep wallet: all munten of the groep. */

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\SocialiteController;
+use App\Http\Controllers\Auth\WachtwoordController;
 use App\Http\Controllers\Web\AccountController;
 use App\Http\Controllers\Web\TicketsController;
 use Illuminate\Support\Facades\Route;
@@ -27,6 +28,10 @@ Route::domain(parse_url(config('app.url'), PHP_URL_HOST))->group(function () {
         Route::get('/auth/google', [SocialiteController::class, 'redirectToWebGoogle'])->name('web.google');
         Route::get('/login', [AccountController::class, 'loginForm'])->name('web.login');
         Route::post('/login', [AccountController::class, 'login'])->middleware('throttle:6,1')->name('web.login.perform');
+        Route::get('/wachtwoord-vergeten', [WachtwoordController::class, 'wachtwoordVergeten'])->name('web.wachtwoord.vergeten');
+        Route::post('/wachtwoord-vergeten', [WachtwoordController::class, 'wachtwoordVeranderenAanvraag'])->middleware('throttle:6,1')->name('web.wachtwoord.vergeten.perform');
+        Route::get('/wachtwoord-veranderen/{token}', [WachtwoordController::class, 'wachtwoordVeranderen'])->name('web.wachtwoord.veranderen');
+        Route::post('/wachtwoord-veranderen', [WachtwoordController::class, 'wachtwoordVeranderenOpslaan'])->middleware('throttle:6,1')->name('web.wachtwoord.veranderen.perform');
         Route::get('/register', [AccountController::class, 'registerForm'])->name('web.register');
         Route::post('/register', [AccountController::class, 'register'])->middleware('throttle:6,1')->name('web.register.perform');
     });

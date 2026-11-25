@@ -10,6 +10,7 @@ use App\Http\Controllers\Dashboard\DeelnemersController;
 use App\Http\Controllers\Dashboard\TicketsController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Auth\SocialiteController;
+use App\Http\Controllers\Auth\WachtwoordController;
 use App\Http\Controllers\Dashboard\DashboardController;
 use App\Http\Middleware\EvenementOrganisator;
 use App\Http\Middleware\HeeftWebToegang;
@@ -31,6 +32,10 @@ Route::middleware('guest')->group(function () {
 
     Route::get('/login', [AuthController::class, 'index'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:6,1')->name('login.perform');
+    Route::get('/wachtwoord-vergeten', [WachtwoordController::class, 'wachtwoordVergeten'])->name('wachtwoord.vergeten');
+    Route::post('/wachtwoord-vergeten', [WachtwoordController::class, 'wachtwoordVeranderenAanvraag'])->middleware('throttle:6,1')->name('wachtwoord.vergeten.perform');
+    Route::get('/wachtwoord-veranderen/{token}', [WachtwoordController::class, 'wachtwoordVeranderen'])->name('wachtwoord.veranderen');
+    Route::post('/wachtwoord-veranderen', [WachtwoordController::class, 'wachtwoordVeranderenOpslaan'])->middleware('throttle:6,1')->name('wachtwoord.veranderen.perform');
 
 //    Route::get('/auth/google', [SocialiteController::class, 'redirectToGoogle'])->name('google.login');
 //    Route::get('/auth/google/callback', [SocialiteController::class, 'handleGoogleCallback'])->name('google.callback');

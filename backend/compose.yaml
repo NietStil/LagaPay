@@ -66,6 +66,15 @@ services:
         depends_on:
             - db
 
+    mailpit:
+        image: axllent/mailpit
+        restart: unless-stopped
+        ports:
+            - "8025:8025"
+            - "1025:1025"
+        networks:
+            - laravel-net
+
 networks:
     laravel-net:
         driver: bridge

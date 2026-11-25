@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use Hidehalo\Nanoid\Client;
+use App\Services\CodeService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -68,11 +68,7 @@ class GekochtTicket extends Model
     /** A new unguessable ticket code (20 nanoid characters, about 120 bits). */
     public static function nieuweCode(): string
     {
-        do {
-            $code = (new Client())->generateId(20);
-        } while (static::where('code', $code)->exists());
-
-        return $code;
+        return CodeService::uniekeCode(static::class, 20);
     }
 
     /** The code from scanned QR content ("LAGAPAY-TICKET:{code}") or a typed code. */
