@@ -167,6 +167,12 @@ export async function updateWachtwoord(data: WachtwoordUpdate): Promise<string> 
   return res.data.message;
 }
 
+/** Mails a link to set a new wachtwoord on the website. Same message whether or not the email has an account. */
+export async function wachtwoordVergeten(email: string): Promise<string> {
+  const res = await apiClient.post('/wachtwoord-vergeten', { email });
+  return res.data.message;
+}
+
 // Bar terminal ---------------------------------------------------------------------------------
 
 /** Evenementen where I'm an actieve terminal (to continue after closing the app). */

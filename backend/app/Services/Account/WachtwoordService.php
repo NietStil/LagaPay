@@ -17,7 +17,7 @@ class WachtwoordService
      */
     public function maakResetToken(string $email): ?string
     {
-        $gebruiker = Gebruiker::where('email', $email)->first();
+        $gebruiker = Gebruiker::where('email', $this->normaliseer($email))->first();
         if (! $gebruiker) {
             return null;
         }
@@ -36,6 +36,8 @@ class WachtwoordService
      */
     public function stuurResetMail(string $email, string $basisUrl): void
     {
+        $email = $this->normaliseer($email);
+
         $token = $this->maakResetToken($email);
         if (! $token) {
             return;
@@ -46,9 +48,18 @@ class WachtwoordService
 
         Mail::to($email)->send(new WachtwoordResetMail(
             link: $link,
-            naam: $gebruiker->voornaam ?: $gebruiker->name,
+            // Google accounts can have an empty voornaam; the mail then greets without a name.
+            naam: trim($gebruiker->voornaam ?: $gebruiker->name) ?: null,
+            // Google-only accounts have no wachtwoord yet: the link sets their first one.
+            heeftWachtwoord: filled($gebruiker->getAuthPassword()),
             minutenGeldig: (int) config('auth.passwords.users.expire', 60),
         ));
+    }
+
+    /** Emails are stored lowercased (registration, Google login); look them up the same way. */
+    protected function normaliseer(string $email): string
+    {
+        return strtolower(trim($email));
     }
 
     /**
@@ -59,7 +70,7 @@ class WachtwoordService
     {
         $status = Password::broker()->reset(
             // 'password' is the broker's key; the provider leaves it out of the gebruiker lookup.
-            ['email' => $email, 'token' => $token, 'password' => $wachtwoord],
+            ['email' => $this->normaliseer($email), 'token' => $token, 'password' => $wachtwoord],
             fn (Gebruiker $gebruiker, string $nieuw) => $this->veranderWachtwoord($gebruiker, $nieuw),
         );
 

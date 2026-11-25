@@ -294,7 +294,7 @@ The app shows it as "Scan (dev)" on Mijn tickets in development builds (`__DEV__
 
 ### Profiel
 
-`GET /user` *(already exists)* → `User`
+`GET /user` *(already exists)* → `User` + `heeft_wachtwoord: boolean` (false for Google-only accounts; only on this endpoint, not in the `user` of login/register/profiel responses)
 
 `PUT /profiel` `{ voornaam, tussenvoegsels?, achternaam, email }` → `{ user: User }`
 Validation: voornaam/achternaam required max 255, tussenvoegsels nullable max 255, email required email unique on gebruikers (ignoring me).
@@ -302,6 +302,13 @@ The email is trimmed and lowercased before validation and storage (same as regis
 
 `PUT /profiel/wachtwoord` `{ huidig_wachtwoord?, wachtwoord, wachtwoord_confirmation }` → `{ message }`
 `huidig_wachtwoord` is required and must match when I already have a wachtwoord (Google-only accounts have none). `wachtwoord` min 8, confirmed. Stored hashed.
+
+### Wachtwoord vergeten
+
+`POST /wachtwoord-vergeten` `{ email }` → `{ message }` *(no auth needed, also works logged in; throttle 6/min)*
+Mails a link to the website's WachtwoordVeranderen page (`{APP_URL}/wachtwoord-veranderen/{token}?email=...`, valid 60 minutes);
+the new wachtwoord is set there, not in the app. Google-only accounts get a "Wachtwoord instellen" mail. Always 200 with the same
+message whether or not the email has an account (and no new mail within 60 s of the previous one); 422 only for an invalid email.
 
 ## Deep links
 

@@ -15,14 +15,15 @@ class WachtwoordResetMail extends Mailable
 
     public function __construct(
         public string $link,
-        public string $naam,
+        public ?string $naam,
+        public bool $heeftWachtwoord,
         public int $minutenGeldig,
     ) {}
 
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Wachtwoord herstellen',
+            subject: $this->heeftWachtwoord ? 'Wachtwoord herstellen' : 'Wachtwoord instellen',
         );
     }
 

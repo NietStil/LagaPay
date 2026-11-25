@@ -12,6 +12,8 @@ export interface User {
   tussenvoegsels?: string | null;
   email: string;
   name?: string;
+  /** Only from GET /user (not from the login/register responses): false for Google-only accounts. */
+  heeft_wachtwoord?: boolean;
 }
 
 export interface RegisterData {

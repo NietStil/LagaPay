@@ -37,6 +37,21 @@ class WachtwoordController extends Controller
         return back();
     }
 
+    /**
+     * The app's request (api.*). api.* serves no pages, so the link goes to the main site's
+     * WachtwoordVeranderen page (APP_URL). Always the same answer, whether or not the email has an account.
+     */
+    public function mobielAanvraag(Request $request)
+    {
+        $request->validate(['email' => 'required|email']);
+
+        $this->wachtwoordService->stuurResetMail($request->input('email'), (string) config('app.url'));
+
+        return response()->json([
+            'message' => 'Als er een account bestaat voor dit e-mailadres, ontvang je een e-mail met een link om je wachtwoord in te stellen.',
+        ]);
+    }
+
     public function wachtwoordVeranderenOpslaan(Request $request)
     {
         $gegevens = $request->validate([
