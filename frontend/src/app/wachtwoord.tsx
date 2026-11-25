@@ -1,12 +1,13 @@
 // Wachtwoord wijzigen (from Profiel). No design: same look as the Profiel and login screens.
 
-import { useState, type ComponentProps } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { useEffect, useState, type ComponentProps } from 'react';
+import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 
-import { Button, ErrorBanner, Screen, ScreenHeader, goBack, kleuren } from '@/components/lagapay';
+import { Button, ErrorBanner, InfoNote, Screen, ScreenHeader, goBack, kleuren } from '@/components/lagapay';
 import { veldFouten } from '@/components/tabs/veld-fouten';
-import { foutmelding, updateWachtwoord } from '@/lib/api/lagapay';
-import { meld } from '@/lib/melding';
+import { useAuth } from '@/context/auth-context';
+import { foutmelding, updateWachtwoord, wachtwoordVergeten } from '@/lib/api/lagapay';
+import { bevestig, meld } from '@/lib/melding';
 
 type Veld = 'huidig_wachtwoord' | 'wachtwoord' | 'wachtwoord_confirmation';
 type Fouten = Partial<Record<Veld, string>>;
@@ -14,6 +15,15 @@ type Fouten = Partial<Record<Veld, string>>;
 const MIN_LENGTE = 8;
 
 export default function WachtwoordScreen() {
+  const { user, refreshUser } = useAuth();
+  // heeft_wachtwoord only comes from GET /user (not from the login response), so load it fresh here.
+  useEffect(() => {
+    void refreshUser();
+  }, []);
+  // Unknown (not loaded yet / older backend): ask for it, the backend decides whether it's needed.
+  const heeftWachtwoord = user?.heeft_wachtwoord !== false;
+
+  const [linkBezig, setLinkBezig] = useState(false);
   const [huidig, setHuidig] = useState('');
   const [nieuw, setNieuw] = useState('');
   const [herhaal, setHerhaal] = useState('');
@@ -40,12 +50,19 @@ export default function WachtwoordScreen() {
     try {
       const bericht = await updateWachtwoord({
         // Accounts that only log in with Google have no wachtwoord; the backend then doesn't need it.
-        huidig_wachtwoord: huidig || undefined,
+        huidig_wachtwoord: (heeftWachtwoord && huidig) || undefined,
         wachtwoord: nieuw,
         wachtwoord_confirmation: herhaal,
       });
       setBezig(false);
-      meld('Wachtwoord gewijzigd', bericht || 'Je wachtwoord is gewijzigd.');
+      // A Google-only account now has a wachtwoord: next time ask for it.
+      void refreshUser();
+      meld(
+        heeftWachtwoord ? 'Wachtwoord gewijzigd' : 'Wachtwoord ingesteld',
+        heeftWachtwoord
+          ? bericht || 'Je wachtwoord is gewijzigd.'
+          : 'Je kunt nu ook inloggen met je e-mailadres en wachtwoord. Inloggen met Google blijft werken.',
+      );
       goBack('/profiel');
     } catch (err) {
       const server = veldFouten(err);
@@ -59,25 +76,71 @@ export default function WachtwoordScreen() {
     }
   };
 
+  /** Huidige wachtwoord kwijt: mails the reset link (set on the website) to my own email. */
+  const stuurHerstellink = async () => {
+    if (!user || linkBezig) return;
+    const ok = await bevestig(
+      'Wachtwoord vergeten?',
+      `We sturen een link naar ${user.email} waarmee je op de website een nieuw wachtwoord instelt.`,
+      { bevestigLabel: 'Link versturen' },
+    );
+    if (!ok) return;
+
+    setLinkBezig(true);
+    try {
+      await wachtwoordVergeten(user.email);
+      meld('Link verstuurd', `Controleer de inbox van ${user.email}. De link is 60 minuten geldig.`);
+    } catch (err: any) {
+      meld(
+        'Versturen mislukt',
+        err?.response?.status === 429
+          ? 'Te veel pogingen. Wacht een minuut en probeer het opnieuw.'
+          : foutmelding(err, 'Versturen mislukt. Probeer het opnieuw.'),
+      );
+    } finally {
+      setLinkBezig(false);
+    }
+  };
+
   return (
     <Screen gap={22}>
-      <ScreenHeader title="Wachtwoord wijzigen" fallbackHref="/profiel" />
+      <ScreenHeader title={heeftWachtwoord ? 'Wachtwoord wijzigen' : 'Wachtwoord instellen'} fallbackHref="/profiel" />
 
       {fout ? <ErrorBanner message={fout} /> : null}
 
+      {!heeftWachtwoord ? (
+        <InfoNote>
+          Je logt in met Google. Stel een wachtwoord in om ook met je e-mailadres in te loggen. Inloggen met Google
+          blijft werken.
+        </InfoNote>
+      ) : null}
+
       <View className="gap-5">
-        <WachtwoordVeld
-          label="Huidig wachtwoord"
-          hint="Log je alleen in met Google? Laat dit veld dan leeg."
-          value={huidig}
-          onChangeText={(w) => {
-            setHuidig(w);
-            wis('huidig_wachtwoord');
-          }}
-          fout={fouten.huidig_wachtwoord}
-          autoComplete="current-password"
-          textContentType="password"
-        />
+        {heeftWachtwoord ? (
+          <View>
+            <WachtwoordVeld
+              label="Huidig wachtwoord"
+              value={huidig}
+              onChangeText={(w) => {
+                setHuidig(w);
+                wis('huidig_wachtwoord');
+              }}
+              fout={fouten.huidig_wachtwoord}
+              autoComplete="current-password"
+              textContentType="password"
+            />
+            <Pressable
+              onPress={() => void stuurHerstellink()}
+              disabled={linkBezig || !user}
+              accessibilityRole="button"
+              hitSlop={8}
+              className="mt-2 flex-row items-center gap-2 self-start active:opacity-70"
+            >
+              <Text className="text-[13px] font-semibold text-purple-300">Wachtwoord vergeten?</Text>
+              {linkBezig ? <ActivityIndicator size="small" color={kleuren.purple300} /> : null}
+            </Pressable>
+          </View>
+        ) : null}
         <WachtwoordVeld
           label="Nieuw wachtwoord"
           hint={`Minimaal ${MIN_LENGTE} tekens.`}

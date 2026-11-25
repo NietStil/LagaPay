@@ -158,6 +158,14 @@ export default function LoginScreen() {
                     />
                     <Text className="text-base font-medium text-zinc-300 ml-2">Onthoud mij</Text>
                   </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() =>
+                      router.push({ pathname: '/wachtwoord-vergeten', params: email.trim() ? { email: email.trim() } : {} })
+                    }
+                    className="p-1"
+                  >
+                    <Text className="text-purple-400 font-medium text-base">Wachtwoord vergeten?</Text>
+                  </TouchableOpacity>
                 </View>
 
                 {/* Submit Button */}

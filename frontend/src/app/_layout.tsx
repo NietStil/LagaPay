@@ -41,7 +41,8 @@ function RootLayoutNav() {
 
     SplashScreen.hideAsync();
 
-    const inAuthGroup = segments[0] === 'login' || segments[0] === 'register';
+    const inAuthGroup =
+      segments[0] === 'login' || segments[0] === 'register' || segments[0] === 'wachtwoord-vergeten';
 
     if (!isAuthenticated && !inAuthGroup) {
       // Remember a join deep link (/e/{code}, /g/{code}) so it can continue after login.
@@ -100,6 +101,7 @@ function RootLayoutNav() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="login" options={{ animation: 'fade' }} />
           <Stack.Screen name="register" options={{ animation: 'fade' }} />
+          <Stack.Screen name="wachtwoord-vergeten" />
           <Stack.Screen name="toevoegen" />
           <Stack.Screen name="evenement/[id]" />
           <Stack.Screen name="wachtwoord" />

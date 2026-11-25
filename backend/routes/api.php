@@ -5,6 +5,7 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\SocialiteController;
+use App\Http\Controllers\Auth\WachtwoordController;
 use App\Http\Controllers\Api\BetaalController;
 use App\Http\Controllers\Api\EvenementController;
 use App\Http\Controllers\Api\GroepController;
@@ -32,8 +33,18 @@ Route::middleware('guest')->group(function () {
     Route::post('/auth/google/token', [SocialiteController::class, 'handleGoogleToken'])->name('google.mobile.token');
 });
 
+// Not in the guest group: the app also calls it while logged in (Wachtwoord wijzigen → "Wachtwoord vergeten?"),
+// and guest's redirect (302) would make the app drop its token.
+Route::post('/wachtwoord-vergeten', [WachtwoordController::class, 'mobielAanvraag'])->middleware('throttle:6,1')->name('wachtwoord.mobiel.vergeten');
+
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return response()->json($request->user());
+    $gebruiker = $request->user();
+
+    return response()->json([
+        ...$gebruiker->toArray(),
+        // Google-only accounts have none: Wachtwoord wijzigen then doesn't ask for the huidige wachtwoord.
+        'heeft_wachtwoord' => filled($gebruiker->getAuthPassword()),
+    ]);
 });
 
 // App endpoints, contract in frontend/app-design/API.md
