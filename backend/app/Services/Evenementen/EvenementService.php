@@ -6,7 +6,7 @@ use App\Models\Evenement;
 use App\Models\Munt;
 use App\Models\Product;
 use App\Models\Transactie;
-use Hidehalo\Nanoid\Client;
+use App\Services\CodeService;
 use Illuminate\Support\Facades\DB;
 
 class EvenementService {
@@ -38,8 +38,9 @@ class EvenementService {
             'munten_terugstorten' => $data['munten_terugstorten'],
             'heeft_tickets'       => $data['heeft_tickets'],
             'munt_prijs'          => $data['munt_prijs'],
-            'code'                => $this->generateUniqueCode('code'),
-            'terminal_code'       => $this->generateUniqueCode('terminal_code'),
+            // 15 characters; terminal_code is the code for bar terminals.
+            'code'                => CodeService::uniekeCode(Evenement::class, 15),
+            'terminal_code'       => CodeService::uniekeCode(Evenement::class, 15, 'terminal_code'),
         ]);
     }
 
@@ -88,14 +89,5 @@ class EvenementService {
         app(DeelnemersService::class)->deelnemerToevoegen($evenement->id, $gebruikerId);
 
         return $evenement;
-    }
-
-    /** A 15 character nanoid that no evenement has in $kolom (code, or terminal_code for bar terminals). */
-    protected function generateUniqueCode(string $kolom): string {
-        do {
-            $code = (new Client())->generateId(15);
-        } while (Evenement::where($kolom, $code)->exists());
-
-        return $code;
     }
 }

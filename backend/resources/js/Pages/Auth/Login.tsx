@@ -10,7 +10,7 @@ interface LoginProps {
 }
 
 export default function Login({ ondertitel, registrerenUrl, googleUrl }: LoginProps) {
-    const { errors } = usePage().props as { errors: Record<string, string> };
+    const { errors, status } = usePage().props as { errors: Record<string, string>; status?: string | null };
 
     const [email, setEmail] = useState('');
     const [wachtwoord, setWachtwoord] = useState('');
@@ -49,6 +49,13 @@ export default function Login({ ondertitel, registrerenUrl, googleUrl }: LoginPr
 
                 {/* Card Container */}
                 <div className="bg-zinc-900 rounded-3xl p-8 border border-zinc-800 shadow-xl">
+
+                    {/* Status message, e.g. after changing the wachtwoord */}
+                    {status && (
+                        <div className="mb-6 p-4 rounded-xl bg-purple-950/40 border border-purple-800/50 text-purple-200 text-sm font-medium">
+                            {status}
+                        </div>
+                    )}
 
                     {/* Validation Errors */}
                     {errors.email && (
@@ -140,6 +147,9 @@ export default function Login({ ondertitel, registrerenUrl, googleUrl }: LoginPr
                                 </div>
                                 <span className="text-sm font-medium text-zinc-300 group-hover:text-white">Onthoud mij</span>
                             </label>
+                            <a href="/wachtwoord-vergeten" className="text-sm font-medium text-purple-400 hover:text-purple-300 transition-colors">
+                                Wachtwoord vergeten?
+                            </a>
                         </div>
 
                         {/* Submit Button */}
