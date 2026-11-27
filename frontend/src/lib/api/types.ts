@@ -132,8 +132,6 @@ export interface GekochteTickets {
   aantal: number;
   /** Of which scanned at the entrance. */
   aantal_gebruikt: number;
-  /** Of which put on offer for friends. */
-  aantal_te_geven: number;
   /** Per ticket type, prijs ascending ("2× Dagticket"). */
   soorten: { naam: string; aantal: number }[];
   /** Included munten of all those tickets. */
@@ -169,8 +167,6 @@ export interface TicketType {
 export interface TicketBestelregel {
   id: number;
   aantal: number;
-  /** How many of `aantal` are put on offer for friends (default 0). */
-  voor_vrienden?: number;
 }
 
 /** One bought ticket with its QR code. */
@@ -185,40 +181,52 @@ export interface TicketQr {
   /** Scanned at the entrance. */
   gebruikt: boolean;
   gebruikt_op: string | null;
-  /** On offer for a friend. */
-  te_geven: boolean;
-  /** Can be put on offer (or taken back): mine, unused, evenement open, munten not paid out yet. */
-  kan_geven: boolean;
-  /** Voornaam of the buyer when a friend gave me this ticket. */
+  /** This ticket's own link ("{link_url}/t/{code}") to give it to one friend; null when it can't be given (used, gesloten). */
+  deel_link: string | null;
+  /** Voornaam of the friend who gave me this ticket. */
   gekregen_van: string | null;
 }
 
-/** My link for handing tickets on offer to friends. */
-export interface TicketUitnodiging {
-  code: string;
-  /** "{link_url}/t/{code}" */
-  link: string;
-  /** Tickets still on offer. */
-  beschikbaar: number;
-  /** Tickets friends took. */
-  vergeven: number;
-  genomen: { naam: string; datum: string }[];
+/** A ticket I bought that a friend claimed. */
+export interface TicketWeggegeven {
+  id: number;
+  /** Ticket type, e.g. "VIP". */
+  naam: string;
+  /** Voornaam of the friend. */
+  aan: string | null;
+  datum: string;
 }
 
 export interface EvenementMijnTickets {
   evenement: EvenementBasis;
   tickets: TicketQr[];
-  /** null until I put a ticket on offer. */
-  uitnodiging: TicketUitnodiging | null;
+  /** My tickets that friends claimed, oldest first. */
+  weggegeven: TicketWeggegeven[];
   deelname: Deelname;
 }
 
-/** Opening a buyer's uitnodigingslink. */
-export interface TicketUitnodigingResultaat {
-  /** gekregen | al_ontvangen (took one before) | al_ticket (own ticket) | eigen_link (my own link) */
-  resultaat: 'gekregen' | 'al_ontvangen' | 'al_ticket' | 'eigen_link';
+/**
+ * Opening a ticket link, before claiming it. beschikbaar: can be claimed; eigen_link: I hold this ticket; al_ticket: I
+ * have a ticket for this evenement already; gebruikt: used at the entrance; gesloten / geblokkeerd: the evenement
+ * doesn't allow it. (A link stops working once its ticket changes hands: that's a 404.)
+ */
+export type TicketLinkStatus = 'beschikbaar' | 'eigen_link' | 'al_ticket' | 'gebruikt' | 'gesloten' | 'geblokkeerd';
+
+export interface TicketUitnodigingVoorbeeld {
+  status: TicketLinkStatus;
+  ticket: { naam: string; munten: number | null };
   evenement: EvenementBasis;
-  /** Voornaam of the buyer. */
+  /** Voornaam of whoever gives it (the holder). */
+  van: string | null;
+  deelname: Deelname;
+}
+
+/** Claiming the ticket of a ticket link. */
+export interface TicketUitnodigingResultaat {
+  /** gekregen, or nothing changed: al_ticket (I have a ticket for this evenement) | eigen_link (I hold it) */
+  resultaat: 'gekregen' | 'al_ticket' | 'eigen_link';
+  evenement: EvenementBasis;
+  /** Voornaam of whoever gave it. */
   van: string | null;
   deelname: Deelname;
 }

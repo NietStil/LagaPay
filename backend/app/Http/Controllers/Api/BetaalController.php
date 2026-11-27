@@ -42,8 +42,7 @@ class BetaalController extends Controller
     }
 
     /**
-     * Buys several tickets in one go: { tickets: [{ id, aantal, voor_vrienden? }] }, where voor_vrienden of the
-     * aantal are put on offer for friends. Responds with the tickets screen data (GET /evenementen/{id}/tickets),
+     * Buys several tickets in one go: { tickets: [{ id, aantal }] }. Responds with the tickets screen data (GET /evenementen/{id}/tickets),
      * so the app can show the new state.
      */
     public function ticketsKopen(TicketsKopenRequest $request): JsonResponse

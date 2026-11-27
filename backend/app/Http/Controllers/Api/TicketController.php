@@ -12,9 +12,16 @@ use App\Services\Mobiel\TicketScanService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 
 class TicketController extends Controller
 {
+    /** Failed ticket link attempts per gebruiker before 429 (see beperkt()). */
+    protected const MAX_MISLUKT = 3;
+
+    /** How long that lasts, counted from the first failure. */
+    protected const BLOKKADE_SECONDEN = 600;
+
     public function __construct(
         protected TicketOverzichtService $ticketService,
         protected TicketScanService $scanService,
@@ -43,38 +50,62 @@ class TicketController extends Controller
         return response()->json($this->ticketService->mijnEvenementTickets($request->user(), $request->attributes->get('evenement')));
     }
 
-    /** Puts one of my tickets on offer for a friend (te_geven: true) or takes it back. Answers like mijn-tickets. */
-    public function teGeven(Request $request, int $id, int $ticket): JsonResponse
+    /** Opening a ticket link, before claiming: which ticket, from whom, and whether I can claim it. */
+    public function uitnodiging(Request $request, string $code): JsonResponse
     {
-        $validated = $request->validate([
-            'te_geven' => ['required', 'boolean'],
-        ]);
-
-        $evenement = $request->attributes->get('evenement');
-
-        try {
-            $this->overdrachtService->zetTeGeven($request->user(), $evenement, $ticket, (bool) $validated['te_geven']);
-        } catch (ModelNotFoundException) {
-            return response()->json(['message' => 'Ticket niet gevonden.'], 404);
-        } catch (TicketOverdrachtFout $e) {
-            return response()->json($e->body(), $e->status);
-        }
-
-        return response()->json($this->ticketService->mijnEvenementTickets($request->user(), $evenement));
+        return $this->beperkt($request, function () use ($request, $code) {
+            try {
+                return response()->json($this->overdrachtService->voorbeeld($request->user(), $code));
+            } catch (ModelNotFoundException) {
+                return response()->json(['message' => 'Deze link werkt niet (meer).'], 404);
+            }
+        });
     }
 
-    /** Opening a buyer's uitnodigingslink: takes one of their tickets on offer (and joins the evenement when allowed). */
+    /** Claiming the ticket of a ticket link (and joining the evenement when allowed). */
     public function accepteer(Request $request, string $code): JsonResponse
     {
-        try {
-            return response()->json($this->overdrachtService->accepteer($request->user(), $code));
-        } catch (ModelNotFoundException) {
-            return response()->json(['message' => 'Uitnodiging niet gevonden.'], 404);
-        } catch (DeelnameGeweigerd $e) {
-            return response()->json($e->body(), 403);
-        } catch (TicketOverdrachtFout $e) {
-            return response()->json($e->body(), $e->status);
+        return $this->beperkt($request, function () use ($request, $code) {
+            try {
+                return response()->json($this->overdrachtService->accepteer($request->user(), $code));
+            } catch (ModelNotFoundException) {
+                return response()->json(['message' => 'Deze link werkt niet (meer).'], 404);
+            } catch (DeelnameGeweigerd $e) {
+                return response()->json($e->body(), 403);
+            } catch (TicketOverdrachtFout $e) {
+                return response()->json($e->body(), $e->status);
+            }
+        });
+    }
+
+    /**
+     * Ticket links are limited per gebruiker: after MAX_MISLUKT failed attempts (unknown link, refused claim) on the
+     * preview or the claim, both answer 429 until BLOKKADE_SECONDEN after the first failure. A claim clears the count.
+     *
+     * @param  callable(): JsonResponse  $poging
+     */
+    protected function beperkt(Request $request, callable $poging): JsonResponse
+    {
+        $sleutel = 'ticket-link:' . $request->user()->id;
+
+        if (RateLimiter::tooManyAttempts($sleutel, self::MAX_MISLUKT)) {
+            $seconden = RateLimiter::availableIn($sleutel);
+            $minuten = max(1, (int) ceil($seconden / 60));
+
+            return response()
+                ->json(['message' => 'Te veel mislukte pogingen. Probeer het over ' . $minuten . ' ' . ($minuten === 1 ? 'minuut' : 'minuten') . ' opnieuw.'], 429)
+                ->header('Retry-After', (string) $seconden);
         }
+
+        $response = $poging();
+
+        if ($response->getStatusCode() >= 400) {
+            RateLimiter::hit($sleutel, self::BLOKKADE_SECONDEN);
+        } elseif (($response->getData(true)['resultaat'] ?? null) === 'gekregen') {
+            RateLimiter::clear($sleutel);
+        }
+
+        return $response;
     }
 
     /** Development only (config lagapay.dev_scan): scans one of my own tickets. Answers like mijn-tickets. */

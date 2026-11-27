@@ -6,7 +6,7 @@ use App\Models\Evenement;
 use App\Models\Gebruiker;
 use App\Models\GekochtTicket;
 use App\Models\Ticket;
-use App\Models\TicketUitnodiging;
+use App\Models\TicketOverdracht;
 use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -53,7 +53,6 @@ class TicketOverzichtService {
                     'status'          => $evenement->open ? 'geldig' : 'verlopen',
                     'aantal'          => $perEvenement->count(),
                     'aantal_gebruikt' => $perEvenement->where('gebruikt', true)->count(),
-                    'aantal_te_geven' => $perEvenement->where('te_geven', true)->count(),
                     'soorten'         => $perEvenement
                         ->groupBy('ticket_id')
                         ->sortBy(fn (Collection $perSoort) => [(float) $perSoort->first()->ticket->prijs, $perSoort->first()->ticket_id])
@@ -146,12 +145,10 @@ class TicketOverzichtService {
 
         $tickets = GekochtTicket::query()
             ->select('gebruiker_ticket.*')
-            ->with(['ticket', 'gekochtDoor:id,voornaam'])
+            ->with(['ticket', 'gekochtDoor:id,voornaam', 'laatsteOverdracht.van:id,voornaam'])
             ->join('tickets', 'tickets.id', '=', 'gebruiker_ticket.ticket_id')
             ->where('gebruiker_ticket.gebruiker_id', $gebruiker->id)
             ->where('tickets.evenement_id', $evenement->id)
-            // My own tickets first, the ones waiting for a friend after them.
-            ->orderBy('gebruiker_ticket.te_geven')
             ->orderBy('tickets.prijs')
             ->orderBy('tickets.id')
             ->orderBy('gebruiker_ticket.id')
@@ -165,71 +162,53 @@ class TicketOverzichtService {
                 'munten'       => $gekocht->ticket->munten,
                 'gebruikt'     => $gekocht->gebruikt,
                 'gebruikt_op'  => $this->weergave->datum($gekocht->gebruikt_op),
-                'te_geven'     => $gekocht->te_geven,
-                // Can be put on offer (or taken back): mine to give, unused, evenement open, munten not paid out yet.
-                'kan_geven'    => ($gekocht->gekocht_door === null || (int) $gekocht->gekocht_door === $gebruiker->id)
-                    && ! $gekocht->gebruikt
-                    && $evenement->open
-                    && ($gekocht->te_geven || ! $gekocht->munten_uitgekeerd),
-                // Set when a friend gave me this ticket: the buyer's voornaam.
-                'gekregen_van' => $gekocht->gekocht_door !== null && (int) $gekocht->gekocht_door !== $gebruiker->id
-                    ? $gekocht->gekochtDoor?->voornaam
-                    : null,
+                // The link that gives this ticket to a friend: while unused and the evenement is open.
+                'deel_link'    => $gekocht->kanDelen() && $evenement->open ? $gekocht->deelLink() : null,
+                // Set when a friend gave me this ticket: their voornaam (rows from before the log: the buyer's).
+                'gekregen_van' => $gekocht->laatsteOverdracht
+                    ? $gekocht->laatsteOverdracht->van?->voornaam
+                    : ($gekocht->koperId() !== $gebruiker->id ? $gekocht->gekochtDoor?->voornaam : null),
             ])
             ->all();
 
         return [
             'evenement'   => $this->weergave->evenementBasis($evenement),
             'tickets'     => $tickets,
-            'uitnodiging' => $this->uitnodiging($gebruiker, $evenement),
+            'weggegeven'  => $this->weggegeven($gebruiker, $evenement),
             'deelname'    => $this->deelname->deelname($gebruiker, $evenement),
         ];
     }
 
-    /**
-     * My uitnodigingslink for this evenement with how many tickets are still on offer and who took one,
-     * or null while I never put a ticket on offer.
-     */
-    protected function uitnodiging(Gebruiker $gebruiker, Evenement $evenement): ?array {
-        $uitnodiging = TicketUitnodiging::where('gebruiker_id', $gebruiker->id)->where('evenement_id', $evenement->id)->first();
-
-        if (! $uitnodiging) {
-            return null;
-        }
-
-        $tickets = GekochtTicket::query()
-            ->select('gebruiker_ticket.*')
-            ->with('gebruiker:id,voornaam,tussenvoegsels,achternaam')
+    /** The tickets I gave to friends for this evenement: which ticket, to whom, when (oldest first). */
+    protected function weggegeven(Gebruiker $gebruiker, Evenement $evenement): array {
+        return TicketOverdracht::query()
+            ->select('ticket_overdrachten.*')
+            ->with(['gekochtTicket.ticket', 'naar:id,voornaam'])
+            ->join('gebruiker_ticket', 'gebruiker_ticket.id', '=', 'ticket_overdrachten.gekocht_ticket_id')
             ->join('tickets', 'tickets.id', '=', 'gebruiker_ticket.ticket_id')
             ->where('tickets.evenement_id', $evenement->id)
-            ->where('gebruiker_ticket.gekocht_door', $gebruiker->id)
-            ->get();
-
-        $genomen = $tickets
-            ->where('gebruiker_id', '!=', $gebruiker->id)
-            ->sortBy('overgedragen_op')
-            ->map(fn (GekochtTicket $gekocht) => [
-                'naam'  => $gekocht->gebruiker->voornaam,
-                'datum' => $this->weergave->datum($gekocht->overgedragen_op),
+            ->where('ticket_overdrachten.van_gebruiker_id', $gebruiker->id)
+            ->orderBy('ticket_overdrachten.created_at')
+            ->orderBy('ticket_overdrachten.id')
+            ->get()
+            ->map(fn (TicketOverdracht $overdracht) => [
+                'id'    => $overdracht->id,
+                'naam'  => $overdracht->gekochtTicket->ticket->naam,
+                'aan'   => $overdracht->naar?->voornaam,
+                'datum' => $this->weergave->datum($overdracht->created_at),
             ])
-            ->values()
             ->all();
-
-        return [
-            'code'        => $uitnodiging->code,
-            'link'        => $uitnodiging->link(),
-            'beschikbaar' => $tickets->where('gebruiker_id', $gebruiker->id)->where('te_geven', true)->where('gebruikt', false)->count(),
-            'vergeven'    => count($genomen),
-            'genomen'     => $genomen,
-        ];
     }
 
-    /** Tickets added without a code (seeders, attach() in older code) get one, so every ticket has a QR code. */
+    /** Tickets added without codes (seeders, attach()) get them, so every ticket has a QR code and a link. */
     protected function zorgVoorCodes(int $gebruikerId): void {
         GekochtTicket::where('gebruiker_id', $gebruikerId)
-            ->whereNull('code')
+            ->where(fn ($query) => $query->whereNull('code')->orWhereNull('deel_code'))
             ->get()
-            ->each(fn (GekochtTicket $gekocht) => $gekocht->update(['code' => GekochtTicket::nieuweCode()]));
+            ->each(fn (GekochtTicket $gekocht) => $gekocht->update([
+                'code'      => $gekocht->code ?? GekochtTicket::nieuweCode(),
+                'deel_code' => $gekocht->deel_code ?? GekochtTicket::nieuweDeelCode(),
+            ]));
     }
 
     protected function mijnTicketIds(int $gebruikerId): \Illuminate\Database\Query\Builder {

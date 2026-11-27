@@ -1,7 +1,8 @@
 // Mijn tickets: my bought tickets of one evenement as QR codes, one per page; swipe through them.
 // A ticket that was scanned at the entrance turns grey with a "Gebruikt" tag. While the screen is open it refetches
 // every few seconds, so that happens right after the scan.
-// Tickets can be put on offer for a friend ("Geef aan een vriend"); one link hands them out (below the tickets).
+// Every unused ticket has its own link (on its card) to give it to one friend, who claims exactly that ticket; also
+// a ticket I got from someone else can be passed on. Below the tickets: which ticket I gave to whom.
 // The scan makes the holder a deelnemer. In development builds "Scan (dev)" scans a ticket without a scanner.
 
 import { useEffect, useRef, useState } from 'react';
@@ -17,7 +18,6 @@ import {
   ErrorState,
   Icon,
   LoadingState,
-  Pill,
   QrCode,
   Screen,
   ScreenHeader,
@@ -26,8 +26,8 @@ import {
   kleuren,
 } from '@/components/lagapay';
 import { useApiData } from '@/hooks/use-api-data';
-import { devScanTicket, foutmelding, getMijnEvenementTickets, zetTicketTeGeven } from '@/lib/api/lagapay';
-import type { TicketQr, TicketUitnodiging } from '@/lib/api/types';
+import { devScanTicket, foutmelding, getMijnEvenementTickets } from '@/lib/api/lagapay';
+import type { TicketQr, TicketWeggegeven } from '@/lib/api/types';
 import { formatDatum, formatMunten, formatTijd } from '@/lib/format';
 
 /** How often the tickets are refetched while the screen is open, to show a scan at the entrance. */
@@ -71,20 +71,7 @@ export default function MijnTicketsScreen() {
     );
   }
 
-  const { evenement, tickets, uitnodiging, deelname } = data;
-
-  // Puts a ticket on offer for a friend, or takes it back.
-  const zetTeGeven = async (ticket: TicketQr, teGeven: boolean) => {
-    setBezigId(ticket.id);
-    setFout(null);
-    try {
-      setData(await zetTicketTeGeven(id, ticket.id, teGeven));
-    } catch (err) {
-      setFout(foutmelding(err, 'Aanpassen lukt niet. Probeer het opnieuw.'));
-    } finally {
-      setBezigId(null);
-    }
-  };
+  const { evenement, tickets, weggegeven, deelname } = data;
 
   // Development only: scans the ticket as if at the entrance (backend lagapay.dev_scan).
   const devScan = async (ticket: TicketQr) => {
@@ -100,7 +87,7 @@ export default function MijnTicketsScreen() {
   };
 
   // Everything handed out: nothing left to show except who took them.
-  if (tickets.length === 0 && !uitnodiging) {
+  if (tickets.length === 0 && weggegeven.length === 0) {
     return (
       <Screen onRefresh={refresh} refreshing={refreshing}>
         {kop}
@@ -137,9 +124,9 @@ export default function MijnTicketsScreen() {
       {tickets.length > 0 ? (
         <TicketPager
           tickets={tickets}
+          evenementNaam={evenement.naam}
           verlopen={!evenement.open}
           bezigId={bezigId}
-          onTeGeven={(ticket, teGeven) => void zetTeGeven(ticket, teGeven)}
           onDevScan={__DEV__ ? (ticket) => void devScan(ticket) : undefined}
         />
       ) : (
@@ -149,7 +136,7 @@ export default function MijnTicketsScreen() {
           text="Al je tickets zijn aan vrienden gegeven. Hieronder zie je wie ze heeft."
         />
       )}
-      {uitnodiging ? <VriendenPaneel uitnodiging={uitnodiging} evenementNaam={evenement.naam} open={evenement.open} /> : null}
+      {weggegeven.length > 0 ? <WeggegevenPaneel weggegeven={weggegeven} /> : null}
     </Screen>
   );
 }
@@ -157,20 +144,20 @@ export default function MijnTicketsScreen() {
 /** One ticket per page, full width; swipe between them, dots under it. Starts at the first ticket that wasn't used yet. */
 function TicketPager({
   tickets,
+  evenementNaam,
   verlopen,
   bezigId,
-  onTeGeven,
   onDevScan,
 }: {
   tickets: TicketQr[];
+  evenementNaam: string;
   verlopen: boolean;
   bezigId: number | null;
-  onTeGeven: (ticket: TicketQr, teGeven: boolean) => void;
   onDevScan?: (ticket: TicketQr) => void;
 }) {
   const [breedte, setBreedte] = useState(0);
-  // Opens on the first ticket of mine that wasn't used yet (tickets for friends come after my own).
-  const [index, setIndex] = useState(() => Math.max(0, tickets.findIndex((t) => !t.gebruikt && !t.te_geven)));
+  // Opens on the first ticket that wasn't used yet.
+  const [index, setIndex] = useState(() => Math.max(0, tickets.findIndex((t) => !t.gebruikt)));
   const huidig = Math.min(index, tickets.length - 1);
 
   return (
@@ -192,10 +179,9 @@ function TicketPager({
                 ticket={item}
                 nummer={i + 1}
                 totaal={tickets.length}
+                evenementNaam={evenementNaam}
                 verlopen={verlopen}
                 breedte={breedte}
-                // Only when the backend says this ticket can still be given (mine, unused, munten not paid out yet).
-                onTeGeven={item.kan_geven ? (teGeven) => onTeGeven(item, teGeven) : undefined}
                 onDevScan={onDevScan && !item.gebruikt ? () => onDevScan(item) : undefined}
                 bezig={bezigId === item.id}
               />
@@ -222,17 +208,16 @@ interface TicketKaartProps {
   ticket: TicketQr;
   nummer: number;
   totaal: number;
+  evenementNaam: string;
   verlopen: boolean;
   breedte: number;
-  /** Undefined when this ticket can't be put on offer (used, received from a friend, gesloten evenement). */
-  onTeGeven?: (teGeven: boolean) => void;
   /** Development builds only, for tickets that weren't used yet. */
   onDevScan?: () => void;
   bezig?: boolean;
 }
 
 /** Ticket naam + status, the QR code (greyed out with a "Gebruikt" tag once scanned) and the code in text. */
-function TicketKaart({ ticket, nummer, totaal, verlopen, breedte, onTeGeven, onDevScan, bezig = false }: TicketKaartProps) {
+function TicketKaart({ ticket, nummer, totaal, evenementNaam, verlopen, breedte, onDevScan, bezig = false }: TicketKaartProps) {
   // Card padding (20 × 2) and the white quiet zone around the code (12 × 2).
   const qrGrootte = Math.min(MAX_QR, breedte - 64);
   const regel = [`Ticket ${nummer} van ${totaal}`, ticket.munten ? `Incl. ${formatMunten(ticket.munten)}` : null]
@@ -252,14 +237,10 @@ function TicketKaart({ ticket, nummer, totaal, verlopen, breedte, onTeGeven, onD
           </Text>
           <Text className="mt-0.5 text-[13px] text-zinc-400">{regel}</Text>
         </View>
-        {ticket.te_geven && !ticket.gebruikt ? (
-          <Pill label="Voor een vriend" tone="accent" />
-        ) : (
-          <StatusPill
-            status={ticket.gebruikt ? 'inactief' : verlopen ? 'verlopen' : 'geldig'}
-            label={ticket.gebruikt ? 'Gebruikt' : undefined}
-          />
-        )}
+        <StatusPill
+          status={ticket.gebruikt ? 'inactief' : verlopen ? 'verlopen' : 'geldig'}
+          label={ticket.gebruikt ? 'Gebruikt' : undefined}
+        />
       </View>
 
       <View accessibilityLabel={ticket.gebruikt ? 'QR-code, gebruikt' : 'QR-code om te scannen bij de ingang'}>
@@ -284,21 +265,21 @@ function TicketKaart({ ticket, nummer, totaal, verlopen, breedte, onTeGeven, onD
             ? `Gescand op ${formatDatum(ticket.gebruikt_op)} om ${formatTijd(ticket.gebruikt_op)}.`
             : 'Dit ticket is gescand.'
           : ticket.gekregen_van
-            ? `Gekregen van ${ticket.gekregen_van}. Laat deze QR-code scannen bij de ingang.`
-            : ticket.te_geven
-              ? 'Wacht op een vriend. Je kunt hem ook zelf gebruiken: laat de QR-code scannen bij de ingang.'
+            ? `Gekregen van ${ticket.gekregen_van}. Laat deze QR-code scannen bij de ingang${ticket.deel_link ? ', of geef hem door met de link hieronder.' : '.'}`
+            : ticket.deel_link
+              ? 'Laat deze QR-code scannen bij de ingang, of geef het ticket aan een vriend met de link hieronder.'
               : 'Laat deze QR-code scannen bij de ingang.'}
       </Text>
 
-      {onTeGeven ? (
-        <Button
-          title={ticket.te_geven ? 'Toch zelf houden' : 'Geef aan een vriend'}
-          icon={ticket.te_geven ? undefined : 'share'}
-          variant="secondary"
-          size="sm"
-          loading={bezig}
-          onPress={() => onTeGeven(!ticket.te_geven)}
-        />
+      {ticket.deel_link ? (
+        <View className="w-full">
+          <Uitnodigingslink
+            link={ticket.deel_link}
+            label="Geef aan een vriend"
+            titel={`${ticket.naam} voor ${evenementNaam}`}
+            omschrijving="Laat je vriend deze QR-code scannen in de LagaPay app. Hij of zij krijgt dit ticket."
+          />
+        </View>
       ) : null}
 
       {onDevScan ? (
@@ -308,59 +289,29 @@ function TicketKaart({ ticket, nummer, totaal, verlopen, breedte, onTeGeven, onD
   );
 }
 
-/**
- * My link for friends: how many tickets are still on offer, the link to share, and who already took one.
- * A friend opening the link gets a ticket and joins the evenement; they never have to handle the ticket.
- */
-function VriendenPaneel({
-  uitnodiging,
-  evenementNaam,
-  open,
-}: {
-  uitnodiging: TicketUitnodiging;
-  evenementNaam: string;
-  open: boolean;
-}) {
-  const { beschikbaar, genomen } = uitnodiging;
-
+/** Which of my tickets friends claimed, and when. */
+function WeggegevenPaneel({ weggegeven }: { weggegeven: TicketWeggegeven[] }) {
   return (
     <View className="gap-3">
-      <SectionLabel>Voor vrienden</SectionLabel>
-      <Text className="text-[13px] leading-5 text-zinc-400">
-        {beschikbaar > 0
-          ? `Nog ${beschikbaar} ${beschikbaar === 1 ? 'ticket' : 'tickets'} voor vrienden. Wie de link opent krijgt een ticket en doet meteen mee, zonder iets te hoeven regelen.`
-          : genomen.length > 0
-            ? 'Al je tickets voor vrienden zijn vergeven.'
-            : 'Zet een ticket op "Geef aan een vriend" om het met de link te delen.'}
-      </Text>
-
-      {beschikbaar > 0 && open ? (
-        <Uitnodigingslink
-          link={uitnodiging.link}
-          label="Link voor vrienden"
-          titel={`Ticket voor ${evenementNaam}`}
-          omschrijving="Laat een vriend deze QR-code scannen in de LagaPay app. Hij of zij krijgt een ticket en doet meteen mee."
-        />
-      ) : null}
-
-      {genomen.length > 0 ? (
-        <Card radius={16} className="overflow-hidden">
-          {genomen.map((vriend, i) => (
-            <View
-              key={`${vriend.naam}-${vriend.datum}-${i}`}
-              className={`flex-row items-center justify-between gap-3 px-4 py-3 ${i < genomen.length - 1 ? 'border-b border-zinc-800' : ''}`}
-            >
-              <View className="flex-row items-center gap-2.5">
-                <Icon name="check" size={16} color={kleuren.emerald300} />
-                <Text className="text-[15px] font-semibold text-zinc-50">{vriend.naam}</Text>
-              </View>
-              <Text className="text-xs text-zinc-500">
-                {formatDatum(vriend.datum)} om {formatTijd(vriend.datum)}
+      <SectionLabel>Gegeven aan vrienden</SectionLabel>
+      <Card radius={16} className="overflow-hidden">
+        {weggegeven.map((ticket, i) => (
+          <View
+            key={ticket.id}
+            className={`flex-row items-center justify-between gap-3 px-4 py-3 ${i < weggegeven.length - 1 ? 'border-b border-zinc-800' : ''}`}
+          >
+            <View className="min-w-0 flex-1 flex-row items-center gap-2.5">
+              <Icon name="check" size={16} color={kleuren.emerald300} />
+              <Text numberOfLines={1} className="flex-1 text-[15px] font-semibold text-zinc-50">
+                {ticket.naam} <Text className="font-normal text-zinc-400">aan</Text> {ticket.aan ?? 'een vriend'}
               </Text>
             </View>
-          ))}
-        </Card>
-      ) : null}
+            <Text className="text-xs text-zinc-500">
+              {formatDatum(ticket.datum)} om {formatTijd(ticket.datum)}
+            </Text>
+          </View>
+        ))}
+      </Card>
     </View>
   );
 }

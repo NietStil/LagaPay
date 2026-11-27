@@ -28,10 +28,10 @@ export async function openEvenementLink(code: string): Promise<LinkBestemming> {
 }
 
 /**
- * Opens a friend's ticket link: takes the ticket (joining only once it is scanned at the entrance). Until then, or when
+ * Claims the ticket of a friend's ticket link (joining only once it is scanned at the entrance). Until then, or when
  * it's my own link, the tickets screen shows the state (own link: my QR codes).
  */
-export async function openTicketLink(code: string): Promise<LinkBestemming> {
+export async function claimTicketLink(code: string): Promise<LinkBestemming> {
   const { resultaat, evenement, deelname } = await accepteerTicketUitnodiging(code);
 
   if (resultaat === 'eigen_link') {

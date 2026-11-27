@@ -38,7 +38,7 @@ const maxVoor = (t: TicketTeKoop) => Math.min(MAX_PER_SOORT, t.beschikbaar ?? MA
 
 /**
  * Buying tickets on the website: the web version of the app's tickets screen (frontend/src/app/evenement/[id]/tickets.tsx),
- * with the same bestelling (aantal + voor vrienden per type). After Afrekenen the server sends me on to my tickets.
+ * with the same bestelling (aantal per type). After Afrekenen the server sends me on to my tickets.
  */
 export default function Tickets(props: TicketsProps) {
     const { evenement, geweigerd, appLink } = props;
@@ -62,7 +62,6 @@ function TicketsKopen({ evenement, deelname, tickets, kopenUrl, mijnTicketsUrl, 
     const fout = Object.values(errors ?? {})[0];
     const [bezig, setBezig] = useState(false);
     const [aantallen, setAantallen] = useState<Record<number, number> | null>(null);
-    const [voorVrienden, setVoorVrienden] = useState<Record<number, number>>({});
 
     const lijst = tickets ?? [];
     // Like the app: one of the cheapest ticket that isn't uitverkocht, while I have none yet.
@@ -73,16 +72,12 @@ function TicketsKopen({ evenement, deelname, tickets, kopenUrl, mijnTicketsUrl, 
     const zetAantal = (ticket: TicketTeKoop, n: number) => {
         const nieuw = Math.max(0, Math.min(maxVoor(ticket), n));
         setAantallen({ ...gekozen, [ticket.id]: nieuw });
-        if ((voorVrienden[ticket.id] ?? 0) > nieuw) setVoorVrienden({ ...voorVrienden, [ticket.id]: nieuw });
     };
-    const zetVoorVrienden = (ticket: TicketTeKoop, n: number) =>
-        setVoorVrienden({ ...voorVrienden, [ticket.id]: Math.max(0, Math.min(gekozen[ticket.id] ?? 0, n)) });
 
     const bestelling = lijst
         .filter((t) => (gekozen[t.id] ?? 0) > 0)
-        .map((t) => ({ id: t.id, aantal: gekozen[t.id], voor_vrienden: voorVrienden[t.id] ?? 0 }));
+        .map((t) => ({ id: t.id, aantal: gekozen[t.id] }));
     const aantalGekozen = bestelling.reduce((som, r) => som + r.aantal, 0);
-    const aantalVoorVrienden = bestelling.reduce((som, r) => som + r.voor_vrienden, 0);
     // In cents, so 3 × € 12,10 doesn't become € 36,300000000000004.
     const totaalCenten = lijst.reduce((som, t) => som + Math.round(Number(t.prijs) * 100) * (gekozen[t.id] ?? 0), 0);
     const inBezit = lijst.reduce((som, t) => som + t.aantal_gekocht, 0);
@@ -133,9 +128,7 @@ function TicketsKopen({ evenement, deelname, tickets, kopenUrl, mijnTicketsUrl, 
                                 key={ticket.id}
                                 ticket={ticket}
                                 aantal={gekozen[ticket.id] ?? 0}
-                                voorVrienden={voorVrienden[ticket.id] ?? 0}
                                 onAantal={ticket.beschikbaar !== 0 ? (n) => zetAantal(ticket, n) : undefined}
-                                onVoorVrienden={(n) => zetVoorVrienden(ticket, n)}
                             />
                         ))}
 
@@ -143,8 +136,7 @@ function TicketsKopen({ evenement, deelname, tickets, kopenUrl, mijnTicketsUrl, 
                             <div>
                                 <p className="text-xs text-zinc-400">
                                     {aantalGekozen > 0
-                                        ? `Totaal · ${aantalGekozen} ${aantalGekozen === 1 ? 'ticket' : 'tickets'}` +
-                                          (aantalVoorVrienden > 0 ? ` (${aantalVoorVrienden} voor vrienden)` : '')
+                                        ? `Totaal · ${aantalGekozen} ${aantalGekozen === 1 ? 'ticket' : 'tickets'}`
                                         : 'Totaal'}
                                 </p>
                                 <p className="text-2xl font-bold text-white">{euro(totaalCenten / 100)}</p>
@@ -179,15 +171,11 @@ function TicketsKopen({ evenement, deelname, tickets, kopenUrl, mijnTicketsUrl, 
 function TicketKaart({
     ticket,
     aantal,
-    voorVrienden,
     onAantal,
-    onVoorVrienden,
 }: {
     ticket: TicketTeKoop;
     aantal: number;
-    voorVrienden: number;
     onAantal?: (n: number) => void;
-    onVoorVrienden: (n: number) => void;
 }) {
     return (
         <div className={`rounded-2xl border p-4 transition-colors ${aantal > 0 ? 'border-purple-600/70 bg-purple-950/20' : 'border-zinc-800 bg-zinc-900'}`}>
@@ -207,13 +195,6 @@ function TicketKaart({
                 </div>
                 {onAantal && <Teller naam={ticket.naam} aantal={aantal} max={maxVoor(ticket)} onAantal={onAantal} />}
             </div>
-
-            {onAantal && aantal > 0 && (
-                <div className="mt-4 flex items-center justify-between gap-4 border-t border-zinc-800 pt-3">
-                    <p className="text-sm text-zinc-400">Waarvan voor vrienden</p>
-                    <Teller naam={`${ticket.naam} voor vrienden`} aantal={voorVrienden} max={aantal} onAantal={onVoorVrienden} />
-                </div>
-            )}
         </div>
     );
 }

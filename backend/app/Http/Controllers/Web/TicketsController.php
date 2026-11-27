@@ -90,7 +90,7 @@ class TicketsController extends Controller
             'evenement'   => $mijn['evenement'],
             'deelname'    => $mijn['deelname'],
             'tickets'     => $mijn['tickets'],
-            'uitnodiging' => $mijn['uitnodiging'],
+            'weggegeven'  => $mijn['weggegeven'],
             'appLink'     => config('lagapay.app_scheme') . '://e/' . $code,
             'ticketsUrl'  => route('web.tickets', $code),
             // How many I just bought (flashed by kopen()).

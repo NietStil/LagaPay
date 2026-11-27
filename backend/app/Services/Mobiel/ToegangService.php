@@ -21,7 +21,7 @@ class ToegangService {
 
     /**
      * The evenement when the gebruiker may see its tickets: a non-blocked deelnemer, or (not blocked) someone who
-     * has a ticket for it or opened its link. Otherwise null. Used by the EvenementZichtbaar middleware.
+     * has a ticket for it, gave one away or opened its link. Otherwise null. Used by the EvenementZichtbaar middleware.
      */
     public function zichtbaarEvenement(Gebruiker $gebruiker, int $evenementId): ?Evenement {
         $evenement = Evenement::find($evenementId);
@@ -54,7 +54,19 @@ class ToegangService {
             ->where('tickets.evenement_id', $evenementId)
             ->exists();
 
-        return $heeftTicket ? $evenement : null;
+        if ($heeftTicket) {
+            return $evenement;
+        }
+
+        // Gave a ticket for it to a friend (also one I had received): to see who has it.
+        $gegeven = DB::table('ticket_overdrachten')
+            ->join('gebruiker_ticket', 'gebruiker_ticket.id', '=', 'ticket_overdrachten.gekocht_ticket_id')
+            ->join('tickets', 'tickets.id', '=', 'gebruiker_ticket.ticket_id')
+            ->where('ticket_overdrachten.van_gebruiker_id', $gebruiker->id)
+            ->where('tickets.evenement_id', $evenementId)
+            ->exists();
+
+        return $gegeven ? $evenement : null;
     }
 
     /**

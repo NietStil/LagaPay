@@ -6,7 +6,6 @@ interface GekochteTickets {
     status: 'geldig' | 'verlopen';
     aantal: number;
     aantal_gebruikt: number;
-    aantal_te_geven: number;
     soorten: { naam: string; aantal: number }[];
     /** /e/{code}/tickets: buy more and the QR codes. */
     url: string;
@@ -67,7 +66,6 @@ export default function MijnTickets({ gekocht, recent_bekeken }: MijnTicketsProp
                                     <p className="mt-1 text-xs text-zinc-500">
                                         {kaart.aantal_gebruikt > 0 ? `${kaart.aantal_gebruikt} gebruikt · ` : ''}
                                         {geldig} nog te gebruiken
-                                        {kaart.aantal_te_geven > 0 ? ` · ${kaart.aantal_te_geven} voor vrienden` : ''}
                                     </p>
                                 </a>
                             );

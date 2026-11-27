@@ -98,7 +98,6 @@ function TicketKaart({ gekocht }: { gekocht: GekochteTickets }) {
   const alleGebruikt = gekocht.aantal_gebruikt === gekocht.aantal;
   const strip = [
     gekocht.munten ? `Incl. ${formatMunten(gekocht.munten)}` : null,
-    gekocht.aantal_te_geven > 0 ? `${gekocht.aantal_te_geven} voor vrienden` : null,
     gekocht.aantal_gebruikt > 0 && !alleGebruikt ? `${gekocht.aantal_gebruikt} van ${gekocht.aantal} gebruikt` : null,
   ]
     .filter(Boolean)

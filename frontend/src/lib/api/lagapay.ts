@@ -21,6 +21,7 @@ import type {
   TerminalVerkoop,
   TicketBestelregel,
   TicketUitnodigingResultaat,
+  TicketUitnodigingVoorbeeld,
   Transactie,
   TransactieFilter,
   User,
@@ -129,17 +130,13 @@ export async function koopTickets(evenementId: number | string, tickets: TicketB
   return res.data;
 }
 
-/** Puts one of my tickets on offer for a friend (or takes it back). Returns the updated Mijn tickets data. */
-export async function zetTicketTeGeven(
-  evenementId: number | string,
-  ticketId: number,
-  teGeven: boolean,
-): Promise<EvenementMijnTickets> {
-  const res = await apiClient.put(`/evenementen/${evenementId}/mijn-tickets/${ticketId}`, { te_geven: teGeven });
+/** Opening a ticket link, before claiming: which ticket it is, from whom, and whether I can claim it. */
+export async function getTicketUitnodiging(code: string): Promise<TicketUitnodigingVoorbeeld> {
+  const res = await apiClient.get(`/ticket-uitnodigingen/${encodeURIComponent(code)}`);
   return res.data;
 }
 
-/** Opening a friend's uitnodigingslink: takes one of their tickets (and joins the evenement when allowed). */
+/** Claims the ticket of a ticket link (and joins the evenement when allowed). */
 export async function accepteerTicketUitnodiging(code: string): Promise<TicketUitnodigingResultaat> {
   const res = await apiClient.post(`/ticket-uitnodigingen/${encodeURIComponent(code)}/accepteren`);
   return res.data;

@@ -11,16 +11,25 @@ interface MijnTicket {
     munten: number;
     gebruikt: boolean;
     gebruikt_op: string | null;
-    te_geven: boolean;
+    /** This ticket's own link to give it to one friend; null when it can't be given. */
+    deel_link: string | null;
     gekregen_van: string | null;
+}
+
+/** A ticket I bought that a friend claimed. */
+interface Weggegeven {
+    id: number;
+    naam: string;
+    aan: string | null;
+    datum: string;
 }
 
 interface EvenementMijnTicketsProps {
     evenement: EvenementBasis;
     deelname: { is_deelnemer: boolean; heeft_ticket: boolean };
     tickets: MijnTicket[];
-    /** My link for friends; `beschikbaar` = tickets still on offer. null until I put one on offer. */
-    uitnodiging: { link: string; beschikbaar: number } | null;
+    /** My tickets that friends claimed. */
+    weggegeven: Weggegeven[];
     appLink: string;
     /** Buying (more) tickets for this evenement. */
     ticketsUrl: string;
@@ -32,7 +41,7 @@ interface EvenementMijnTicketsProps {
  * My tickets of one evenement with their QR codes: the web version of the app's evenement/[id]/mijn-tickets screen.
  * Buying tickets ends here.
  */
-export default function EvenementMijnTickets({ evenement, deelname, tickets, uitnodiging, appLink, ticketsUrl, gekocht }: EvenementMijnTicketsProps) {
+export default function EvenementMijnTickets({ evenement, deelname, tickets, weggegeven, appLink, ticketsUrl, gekocht }: EvenementMijnTicketsProps) {
     return (
         <WebLayout title={`Mijn tickets · ${evenement.naam}`}>
             <div className="space-y-8">
@@ -66,13 +75,16 @@ export default function EvenementMijnTickets({ evenement, deelname, tickets, uit
                     )}
                 </section>
 
-                {uitnodiging && uitnodiging.beschikbaar > 0 && (
+                {weggegeven.length > 0 && (
                     <section className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 space-y-2">
-                        <h2 className="font-semibold text-white">Tickets voor vrienden</h2>
-                        <p className="text-sm text-zinc-400">
-                            Deel deze link: je vrienden openen hem in de LagaPay-app en krijgen dan een van je tickets.
-                        </p>
-                        <code className="block break-all rounded-lg bg-zinc-950 px-3 py-2 text-sm text-purple-300">{uitnodiging.link}</code>
+                        <h2 className="font-semibold text-white">Gegeven aan vrienden</h2>
+                        <ul className="space-y-1 text-sm text-zinc-300">
+                            {weggegeven.map((w) => (
+                                <li key={w.id}>
+                                    {w.naam} aan {w.aan ?? 'een vriend'} <span className="text-zinc-500">· {datum(w.datum)}</span>
+                                </li>
+                            ))}
+                        </ul>
                     </section>
                 )}
 
@@ -106,9 +118,7 @@ function MijnTicketKaart({ ticket }: { ticket: MijnTicket }) {
 
     const status = ticket.gebruikt
         ? `Gescand${ticket.gebruikt_op ? ` op ${datum(ticket.gebruikt_op)}` : ''}`
-        : ticket.te_geven
-          ? 'Voor een vriend, nog niet opgehaald'
-          : ticket.gekregen_van
+        : ticket.gekregen_van
             ? `Gekregen van ${ticket.gekregen_van}`
             : 'Geldig';
 
@@ -129,6 +139,12 @@ function MijnTicketKaart({ ticket }: { ticket: MijnTicket }) {
             </div>
             <p className={`mt-3 font-semibold ${ticket.gebruikt ? 'text-zinc-400' : 'text-white'}`}>{ticket.naam}</p>
             <p className="text-sm text-zinc-400">{status}</p>
+            {ticket.deel_link && (
+                <div className="mt-2 space-y-1">
+                    <p className="text-xs text-zinc-500">Geef dit ticket aan een vriend met deze link (openen in de LagaPay-app):</p>
+                    <code className="block break-all rounded-lg bg-zinc-950 px-3 py-2 text-sm text-purple-300">{ticket.deel_link}</code>
+                </div>
+            )}
         </div>
     );
 }

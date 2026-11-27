@@ -8,8 +8,8 @@ use App\Models\GekochtTicket;
 use Illuminate\Support\Facades\DB;
 
 /**
- * The munten included with a ticket go to whoever holds it, once they are a deelnemer of the evenement.
- * A ticket that is on offer for a friend (te_geven) credits nobody until a friend takes it.
+ * The munten included with a ticket go to whoever holds it when it is scanned at the entrance (once they are a
+ * deelnemer of the evenement), one ticket at a time: buying or receiving a ticket credits nothing.
  */
 class TicketMuntenService {
     public function __construct(
@@ -17,9 +17,9 @@ class TicketMuntenService {
     ) {}
 
     /**
-     * Credits the included munten of my tickets of this evenement that haven't been credited yet, as one
-     * "ticket" transactie. Does nothing when I'm not a (non-blocked) deelnemer yet; safe to call any time.
-     * Returns the munten credited.
+     * Credits the included munten of my scanned tickets of this evenement that haven't been credited yet, as one
+     * "ticket" transactie. Unscanned tickets wait for their scan. Does nothing when I'm not a (non-blocked)
+     * deelnemer yet (a holder who joins later still gets them); safe to call any time. Returns the munten credited.
      */
     public function uitkeren(Gebruiker $gebruiker, Evenement $evenement): int {
         $isDeelnemer = DB::table('gebruiker_evenement')
@@ -39,7 +39,7 @@ class TicketMuntenService {
                 ->join('tickets', 'tickets.id', '=', 'gebruiker_ticket.ticket_id')
                 ->where('gebruiker_ticket.gebruiker_id', $gebruiker->id)
                 ->where('tickets.evenement_id', $evenement->id)
-                ->where('gebruiker_ticket.te_geven', false)
+                ->where('gebruiker_ticket.gebruikt', true)
                 ->where('gebruiker_ticket.munten_uitgekeerd', false)
                 ->lockForUpdate()
                 ->get();

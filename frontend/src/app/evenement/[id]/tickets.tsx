@@ -1,7 +1,6 @@
 // Screen 13 — Tickets kopen (Tickets.dc.html): choose how many of each ticket type, and buy them in one go.
 // Until Mollie exists, Afrekenen is a test betaling: the tickets (and their munten) are yours straight away,
-// and the app opens "Mijn tickets" with their QR codes. Per ticket type, some of the tickets can be "voor vrienden":
-// those wait for a friend to take them through my link (also on Mijn tickets) and don't give me munten.
+// and the app opens "Mijn tickets" with their QR codes. Every ticket there has its own link to give it to a friend.
 // It is also where an evenement link with tickets lands before you're a deelnemer: the status card on top
 // says what's needed: buy a ticket, then have it scanned at the entrance (the scan makes you a deelnemer).
 
@@ -56,8 +55,6 @@ export default function TicketsKopenScreen() {
   const { data, error, loading, refreshing, reload, refresh, setData } = useApiData(() => laadTickets(id), [id]);
   // Chosen number per ticket id; null until the user changes something (then the default below applies).
   const [aantallen, setAantallen] = useState<Record<number, number> | null>(null);
-  // Of those, how many per ticket id are for friends.
-  const [voorVrienden, setVoorVrienden] = useState<Record<number, number>>({});
   const [bezig, setBezig] = useState(false);
   const [fout, setFout] = useState<string | null>(null);
 
@@ -108,17 +105,12 @@ export default function TicketsKopenScreen() {
     const ticket = tickets.find((t) => t.id === ticketId);
     const nieuw = Math.max(0, Math.min(ticket ? maxVoor(ticket) : MAX_PER_SOORT, n));
     setAantallen({ ...gekozen, [ticketId]: nieuw });
-    // Never more for friends than bought.
-    if ((voorVrienden[ticketId] ?? 0) > nieuw) setVoorVrienden({ ...voorVrienden, [ticketId]: nieuw });
   };
-  const zetVoorVrienden = (ticketId: number, n: number) =>
-    setVoorVrienden({ ...voorVrienden, [ticketId]: Math.max(0, Math.min(gekozen[ticketId] ?? 0, n)) });
 
   const bestelling = tickets
     .filter((t) => (gekozen[t.id] ?? 0) > 0)
-    .map((t) => ({ id: t.id, aantal: gekozen[t.id], voor_vrienden: voorVrienden[t.id] ?? 0 }));
+    .map((t) => ({ id: t.id, aantal: gekozen[t.id] }));
   const aantalGekozen = bestelling.reduce((som, regel) => som + regel.aantal, 0);
-  const aantalVoorVrienden = bestelling.reduce((som, regel) => som + regel.voor_vrienden, 0);
   // In cents, so 3 × € 12,10 doesn't become € 36,300000000000004.
   const totaalCenten = tickets.reduce((som, t) => som + Math.round(Number(t.prijs) * 100) * (gekozen[t.id] ?? 0), 0);
   const inBezit = tickets.reduce((som, t) => som + t.aantal_gekocht, 0);
@@ -130,12 +122,11 @@ export default function TicketsKopenScreen() {
     try {
       setData({ soort: 'ok', data: await koopTickets(id, bestelling) });
       setAantallen({});
-      setVoorVrienden({});
       meld(
         aantalGekozen === 1 ? 'Ticket gekocht' : `${aantalGekozen} tickets gekocht`,
         'Testmodus: er is nog niet echt betaald.',
       );
-      // Straight to the QR codes (and, for tickets for friends, the link to hand them out).
+      // Straight to the QR codes (each with its link for a friend).
       router.push(`/evenement/${id}/mijn-tickets`);
     } catch (err) {
       setFout(foutmelding(err, 'Afrekenen lukt niet. Probeer het opnieuw.'));
@@ -158,8 +149,7 @@ export default function TicketsKopenScreen() {
             <View>
               <Text className="text-xs text-zinc-400">
                 {aantalGekozen > 0
-                  ? `Totaal · ${aantalGekozen} ${aantalGekozen === 1 ? 'ticket' : 'tickets'}` +
-                    (aantalVoorVrienden > 0 ? ` (${aantalVoorVrienden} voor vrienden)` : '')
+                  ? `Totaal · ${aantalGekozen} ${aantalGekozen === 1 ? 'ticket' : 'tickets'}`
                   : 'Totaal'}
               </Text>
               <Text className="text-[22px] font-bold text-zinc-50">{formatEuro(totaalCenten / 100)}</Text>
@@ -202,8 +192,6 @@ export default function TicketsKopenScreen() {
             ticket={ticket}
             aantal={gekozen[ticket.id] ?? 0}
             onAantal={evenement.open && ticket.beschikbaar !== 0 ? (n) => zetAantal(ticket.id, n) : undefined}
-            voorVrienden={voorVrienden[ticket.id] ?? 0}
-            onVoorVrienden={evenement.open ? (n) => zetVoorVrienden(ticket.id, n) : undefined}
           />
         ))}
       </View>
@@ -277,13 +265,10 @@ interface TicketKaartProps {
   aantal: number;
   /** Undefined when nothing can be bought (gesloten evenement). */
   onAantal?: (aantal: number) => void;
-  /** Of `aantal`, how many are for friends. */
-  voorVrienden: number;
-  onVoorVrienden?: (aantal: number) => void;
 }
 
 /** Ticket type card: naam + prijs, then a divider with the munten pill, how many I have, and the −/+ counter. */
-function TicketKaart({ ticket, aantal, onAantal, voorVrienden, onVoorVrienden }: TicketKaartProps) {
+function TicketKaart({ ticket, aantal, onAantal }: TicketKaartProps) {
   const gekozen = aantal > 0;
 
   return (
@@ -316,16 +301,6 @@ function TicketKaart({ ticket, aantal, onAantal, voorVrienden, onVoorVrienden }:
         </View>
         {onAantal ? <Teller naam={ticket.naam} aantal={aantal} onAantal={onAantal} max={maxVoor(ticket)} /> : null}
       </View>
-      {/* Only once at least one is chosen: how many of those are for friends. */}
-      {onVoorVrienden && aantal > 0 ? (
-        <View className="flex-row items-center justify-between gap-3 border-t border-zinc-800 pt-3">
-          <View className="min-w-0 flex-1">
-            <Text className="text-[13px] font-semibold text-zinc-200">Waarvan voor vrienden</Text>
-            <Text className="mt-0.5 text-xs text-zinc-500">Zij krijgen het ticket en de munten via jouw link.</Text>
-          </View>
-          <Teller naam={`${ticket.naam} voor vrienden`} aantal={voorVrienden} onAantal={onVoorVrienden} max={aantal} />
-        </View>
-      ) : null}
     </View>
   );
 }

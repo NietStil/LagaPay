@@ -16,7 +16,7 @@ import {
   kleuren,
 } from '@/components/lagapay';
 import { foutmelding } from '@/lib/api/lagapay';
-import { openEvenementLink, openGroepLink, openTicketLink } from '@/lib/deelnemen';
+import { openEvenementLink, openGroepLink } from '@/lib/deelnemen';
 import { TICKET_QR_VOORVOEGSEL, parseLagaPayLink, type LagaPayLink } from '@/lib/links';
 
 /** An evenement code as typed in: 15 nanoid characters (backend `evenementen.code`). */
@@ -68,6 +68,11 @@ export default function ToevoegenScreen() {
       router.replace(`/k/${link.code}`);
       return;
     }
+    // A ticket link: its screen shows which ticket it is before claiming it.
+    if (link.soort === 'ticket') {
+      router.replace(`/t/${link.code}`);
+      return;
+    }
 
     bezigRef.current = true;
     setBezig(true);
@@ -76,9 +81,6 @@ export default function ToevoegenScreen() {
       // Evenementen with tickets open their tickets screen until I have a ticket and the evenement has started.
       if (link.soort === 'evenement') {
         const { evenementId, naarTickets } = await openEvenementLink(link.code);
-        router.replace(naarTickets ? `/evenement/${evenementId}/tickets` : `/evenement/${evenementId}`);
-      } else if (link.soort === 'ticket') {
-        const { evenementId, naarTickets } = await openTicketLink(link.code);
         router.replace(naarTickets ? `/evenement/${evenementId}/tickets` : `/evenement/${evenementId}`);
       } else {
         const { evenementId, naarTickets } = await openGroepLink(link.code);
