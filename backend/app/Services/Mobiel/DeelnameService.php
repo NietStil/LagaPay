@@ -129,14 +129,12 @@ class DeelnameService {
         return [
             'is_deelnemer' => $geblokkeerd !== null && ! $geblokkeerd,
             'geblokkeerd'  => (bool) $geblokkeerd,
-            // A ticket I put on offer for a friend isn't mine to join with.
             'heeft_ticket' => DB::table('gebruiker_ticket')
                 ->join('tickets', 'tickets.id', '=', 'gebruiker_ticket.ticket_id')
                 ->where('gebruiker_ticket.gebruiker_id', $gebruikerId)
-                ->where('gebruiker_ticket.te_geven', false)
                 ->where('tickets.evenement_id', $evenement->id)
                 ->exists(),
-            // Scanned at the entrance; also a ticket I had put on offer but used myself.
+            // Scanned at the entrance.
             'ticket_gescand' => DB::table('gebruiker_ticket')
                 ->join('tickets', 'tickets.id', '=', 'gebruiker_ticket.ticket_id')
                 ->where('gebruiker_ticket.gebruiker_id', $gebruikerId)

@@ -7,7 +7,6 @@ use App\Models\Gebruiker;
 use App\Models\GekochtTicket;
 use App\Models\Opwaardering;
 use App\Models\Ticket;
-use App\Models\TicketUitnodiging;
 use App\Services\Mobiel\Exceptions\TicketsUitverkocht;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
@@ -24,7 +23,6 @@ class BetaalService {
         protected EvenementOverzichtService $overzicht,
         protected GroepService $groepen,
         protected PortemonneeService $portemonnee,
-        protected TicketMuntenService $ticketMunten,
     ) {}
 
     /**
@@ -63,10 +61,9 @@ class BetaalService {
     }
 
     /**
-     * Buys several tickets in one go. $bestelling is [ticket id => ['aantal' => n, 'voor_vrienden' => m]]: m of the n
-     * tickets of that type are put on offer for friends (te_geven, taken through my uitnodigingslink) instead of
-     * being mine. Every ticket is its own row with its own QR code. The included munten go to the holder once
-     * they are a deelnemer, so none are credited for tickets on offer.
+     * Buys several tickets in one go. $bestelling is [ticket id => ['aantal' => n]]. Every ticket is its own row with
+     * its own QR code and its own link to give it to a friend (deel_code). The included munten go to the holder when
+     * the ticket is scanned, so nothing is credited here.
      *
      * A ticket type with a capaciteit sells at most that many (counted under a lock, so two buyers can't both get
      * the last ones).
@@ -103,8 +100,6 @@ class BetaalService {
                 }
             }
 
-            $voorVrienden = 0;
-
             foreach ($bestelling as $ticketId => $regel) {
                 for ($i = 0; $i < $regel['aantal']; $i++) {
                     GekochtTicket::create([
@@ -112,19 +107,13 @@ class BetaalService {
                         'ticket_id'    => $tickets[$ticketId]->id,
                         'gekocht_door' => $gebruiker->id,
                         'code'         => GekochtTicket::nieuweCode(),
-                        'te_geven'     => $i < $regel['voor_vrienden'],
+                        // Its link for a friend (TicketOverdrachtService).
+                        'deel_code'    => GekochtTicket::nieuweDeelCode(),
                     ]);
                 }
-
-                $voorVrienden += $regel['voor_vrienden'];
             }
 
-            if ($voorVrienden > 0) {
-                TicketUitnodiging::voor($gebruiker->id, $evenement->id);
-            }
-
-            // Already a deelnemer: the tickets I keep pay out right away. Otherwise at joining.
-            $this->ticketMunten->uitkeren($gebruiker, $evenement);
+            // The included munten are credited when each ticket is scanned (TicketMuntenService), not now.
         });
     }
 

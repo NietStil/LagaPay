@@ -43,15 +43,20 @@ Until Mollie exists, opwaarderen and tickets kopen are **test betalingen**: book
 - **Gekochte tickets**: every `gebruiker_ticket` row is one bought ticket with its own `code` (20 nanoid characters) for its QR code
   (QR content `LAGAPAY-TICKET:{code}`). Scanning at the entrance sets `gebruikt` and `gebruikt_op`. Rows added without a code
   (seeders, `attach()`) get one when their owner opens `mijn-tickets`.
-- **Tickets for friends**: `gebruiker_id` is the holder, `gekocht_door` the buyer. The buyer can put tickets on offer (`te_geven`)
-  and shares one link per evenement (`ticket_uitnodigingen`, `{link_url}/t/{code}`). A friend opening it takes the oldest ticket on
-  offer: the row moves to the friend (`overgedragen_op`), gets a **new code** (the buyer's QR stops working) and the friend joins the
-  evenement when the deelname rules allow it. A friend takes at most one ticket per link, and not when they already have a ticket
-  of their own for that evenement.
-- **Munten of a ticket** (`tickets.munten`) are credited to the **holder as soon as they are a deelnemer** (one `ticket` transactie
-  per payout, `gebruiker_ticket.munten_uitgekeerd`): when a deelnemer buys, when someone joins, when a friend takes a ticket, and
-  when the buyer takes a ticket back. A ticket on offer credits nobody. A ticket whose munten were paid out can't be put on offer.
-  Tickets bought before this existed count as paid out.
+- **Tickets for friends**: `gebruiker_id` is the holder, `gekocht_door` the buyer. **Every ticket has its own link**
+  (`gebruiker_ticket.deel_code`, 20 characters, `{link_url}/t/{deel_code}`); there is nothing to choose or switch on. The holder can send it to one
+  friend while the ticket is unused (`deel_link` in `mijn-tickets`), **also a ticket they received**; it claims **exactly that
+  ticket**. Claiming moves the row to the friend with a **new code** (the giver's QR stops working) and a **new `deel_code`** (the old
+  link stops working, 404; the friend can pass it on with theirs). `gekocht_door` stays the buyer (who paid). Every claim is logged in
+  `ticket_overdrachten` (`gekocht_ticket_id`, `van_gebruiker_id`, `naar_gebruiker_id`, `created_at`): "gekregen van" and "gegeven aan"
+  come from there, and whoever gave a ticket away can still open the evenement's tickets screens. A friend gets at most one ticket per
+  evenement, and none when they already hold a ticket for it. The friend joins the evenement when the deelname rules allow it (for evenementen with tickets: when the
+  ticket is scanned). Rows added without codes (seeders) get a `deel_code` when their holder opens `mijn-tickets`.
+- **Munten of a ticket** (`tickets.munten`) are credited **per ticket when it is scanned** at the entrance, to its holder at that
+  moment (one `ticket` transactie per payout, `gebruiker_ticket.munten_uitgekeerd`). Buying or receiving a ticket credits nothing,
+  and scanning one ticket doesn't pay out the holder's other tickets. A holder who isn't a deelnemer when scanned (gesloten,
+  blocked) gets the munten if they join later. Tickets bought before this existed count as paid out (to the buyer): a friend who
+  gets one doesn't get its munten again.
 - **Deelname** (who may become deelnemer): the evenement is open and I'm not blocked. With `heeft_tickets` one of my tickets must
   have been scanned at the entrance (`gebruiker_ticket.gebruikt`); the start date doesn't matter. The scan (`POST /tickets/scan`) makes the
   holder a deelnemer right away, so for evenementen with tickets that is the way in, and only then can I opwaarderen (buy munten).
@@ -105,7 +110,7 @@ Opening an evenement link (deep link / QR). Doesn't make me a deelnemer; stores 
 ```ts
 Deelname = {
   is_deelnemer: boolean;   // non-blocked row in gebruiker_evenement
-  heeft_ticket: boolean;   // a ticket of mine for this evenement (not on offer for a friend)
+  heeft_ticket: boolean;   // I hold a ticket for this evenement
   ticket_gescand: boolean; // one of my tickets was scanned at the entrance
   gestart: boolean;        // start_datum <= now (informational, not a deelname rule)
   kan_deelnemen: boolean;  // not a deelnemer yet, and the deelname rules allow it now
@@ -207,7 +212,6 @@ Checks run in the order 422 invalid `soort`, 403, 404, 422 not in a groep.
     status: 'geldig' | 'verlopen';
     aantal: number;               // tickets I bought for this evenement
     aantal_gebruikt: number;      // of which scanned at the entrance
-    aantal_te_geven: number;      // of which put on offer for friends
     soorten: { naam: string; aantal: number }[];  // per ticket type, prijs asc ("2× Dagticket")
     munten: number;               // included munten of all those tickets
   }[];
@@ -233,10 +237,10 @@ Access: non-blocked deelnemer, ticket holder, or someone who opened the link; ot
 
 `POST /evenementen/{id}/tickets/kopen` `{ tickets: { id, aantal }[] }` → same shape as `GET /evenementen/{id}/tickets` *(test betaling)*
 Several types and numbers in one go (`aantal` 1–10, each `id` once, max 20 lines). One `gebruiker_ticket` row with its own code per
-ticket. `voor_vrienden` (optional, 0–`aantal`) of them are put on offer for friends (see "Tickets for friends"); the others are mine and
-their munten are credited as soon as I'm a deelnemer. Same access as the tickets.
-Body line: `{ id: number; aantal: number; voor_vrienden?: number }`.
-404 a ticket not of this evenement; 403 gesloten / no tickets / test betalingen off; 422 validation (also `voor_vrienden > aantal`).
+ticket, and its own link to give it to a friend (see "Tickets for friends"). Their munten are credited when each is scanned. Same
+access as the tickets.
+Body line: `{ id: number; aantal: number }`.
+404 a ticket not of this evenement; 403 gesloten / no tickets / test betalingen off; 422 validation.
 
 `GET /evenementen/{id}/mijn-tickets` → the "Mijn tickets" QR screen
 ```ts
@@ -247,35 +251,45 @@ Body line: `{ id: number; aantal: number; voor_vrienden?: number }`.
     qr: string;                  // QR content: "LAGAPAY-TICKET:{code}"
     naam: string; prijs: string; munten: number | null;
     gebruikt: boolean; gebruikt_op: string | null;
-    te_geven: boolean;           // on offer for a friend
-    kan_geven: boolean;          // can be put on offer / taken back: mine, unused, evenement open, munten not paid out yet
-    gekregen_van: string | null; // voornaam of the buyer when a friend gave me this ticket
-  }[];                           // tickets I hold: my own first, then those on offer; prijs asc, then bought first
-  uitnodiging: {                 // null until I put a ticket on offer
-    code: string;
-    link: string;                // "{link_url}/t/{code}"
-    beschikbaar: number;         // tickets still on offer
-    vergeven: number;            // tickets friends took
-    genomen: { naam: string; datum: string }[];   // who took one, oldest first
-  } | null;
+    deel_link: string | null;    // "{link_url}/t/{deel_code}" to give it to one friend; null when used or gesloten
+    gekregen_van: string | null; // voornaam of the friend who gave me this ticket
+  }[];                           // tickets I hold: prijs asc, then bought first
+  weggegeven: {                  // tickets I gave to friends (ticket_overdrachten), oldest first
+    id: number;
+    naam: string;                // ticket type
+    aan: string | null;          // voornaam of the friend
+    datum: string;               // when they claimed it
+  }[];
   deelname: Deelname;
 }
 ```
-Same access as the tickets (ticket holders are allowed).
+Same access as the tickets (ticket holders, and whoever gave one away, are allowed).
 
-`PUT /evenementen/{id}/mijn-tickets/{ticket}` `{ te_geven: boolean }` → same shape as `GET /evenementen/{id}/mijn-tickets`
-Puts one of my tickets on offer for a friend (creating my uitnodigingslink if needed), or takes it back (its munten are then credited
-when I'm a deelnemer). Only for tickets I bought; 404 not mine; 403 given to me / gesloten; 409 already used, or its munten are
-already on my saldo; 422 validation.
+`GET /ticket-uitnodigingen/{code}` → `TicketUitnodigingVoorbeeld`
+Opening a ticket link, before claiming (the app route `t/[code]` shows it with "Ticket ophalen"). 404 unknown link.
+`deel_code` is 20 characters (`[A-Za-z0-9_-]`). **Limited per gebruiker**: after 3 failed attempts on this endpoint or on
+`accepteren` (any 4xx: unknown link, refused claim) both answer 429 `{ message }` with `Retry-After` until 10 minutes after the
+first failure. A successful claim clears the count; "nothing changed" answers (`eigen_link`, `al_ticket`) don't count.
+```ts
+TicketUitnodigingVoorbeeld = {
+  status: 'beschikbaar' | 'eigen_link' | 'al_ticket' | 'gebruikt' | 'gesloten' | 'geblokkeerd';
+  ticket: { naam: string; munten: number | null };   // munten null when none, or already paid out to the buyer (old tickets)
+  evenement: EvenementBasis;
+  van: string | null;            // voornaam of whoever gives it (the holder)
+  deelname: Deelname;
+}
+```
+`eigen_link`: I hold this ticket; `al_ticket`: I hold a ticket for this evenement already; `gebruikt`: used at the entrance. A link of
+a ticket that changed hands is a 404.
 
 `POST /ticket-uitnodigingen/{code}/accepteren` → `{ resultaat, evenement: EvenementBasis, van: string | null, deelname: Deelname }`
-Opening a buyer's uitnodigingslink (the app route `t/[code]`). Takes one ticket on offer, then joins the evenement when
-`deelname.kan_deelnemen` (in practice: the friend becomes a deelnemer when the ticket is scanned at the entrance).
-`resultaat`: `gekregen` | `al_ontvangen` (I took one before) | `al_ticket` (I have my own ticket) | `eigen_link` (it's my link).
-404 unknown code; 403 DeelnameWeigering `gesloten` / `geblokkeerd`; 409 `{ message, reden: 'vol', evenement_id }` all tickets are given away.
+Claims the ticket of this link, then joins the evenement when `deelname.kan_deelnemen` (in practice: the friend becomes a deelnemer
+when the ticket is scanned at the entrance). `resultaat`: `gekregen`, or nothing changed: `al_ticket` | `eigen_link`. `van`: who gave it.
+404 unknown link; 403 DeelnameWeigering `gesloten` / `geblokkeerd`; 409 `{ message, reden, evenement_id }`: `gebruikt`, or `opgehaald`
+(someone else claimed it a moment earlier).
 
 `POST /tickets/scan` `{ code, evenement_id? }` → `{ ticket: GescandTicket }` (organiser of the evenement, or `rol` admin)
-Marks the ticket as used and makes its holder a deelnemer (crediting the munten of their tickets), unless the evenement is gesloten
+Marks the ticket as used and makes its holder a deelnemer (crediting the munten of that ticket), unless the evenement is gesloten
 or the holder is blocked. `code` is the QR content or the typed code. There is no scanner screen yet; this is the API for one.
 ```ts
 GescandTicket = {
@@ -314,7 +328,8 @@ message whether or not the email has an account (and no new mail within 60 s of 
 
 - Evenement: `https://lagapay.nl/e/{evenement.code}` and `lagapay://e/{code}` → app route `src/app/e/[code].tsx` → `POST /evenementen/bekijk`,
   then the evenement, `POST /evenementen/join` + the evenement, or the tickets screen (see `src/lib/deelnemen.ts`).
-- Ticket for a friend: `https://lagapay.nl/t/{code}` and `lagapay://t/{code}` → app route `src/app/t/[code].tsx` →
+- Ticket for a friend (one link per ticket): `https://lagapay.nl/t/{deel_code}` and `lagapay://t/{deel_code}` → app route
+  `src/app/t/[code].tsx` → `GET /ticket-uitnodigingen/{code}` (which ticket, from whom), "Ticket ophalen" →
   `POST /ticket-uitnodigingen/{code}/accepteren`, then the evenement (deelnemer) or its tickets screen.
 - Groep: `https://lagapay.nl/g/{groep.code}` and `lagapay://g/{code}` → app route `src/app/g/[code].tsx` → `POST /groepen/join`
   (refused with `ticket_nodig` / `niet_gescand` → the evenement's tickets screen).

@@ -5,13 +5,18 @@ namespace App\Models;
 use App\Services\CodeService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * One bought ticket (a row of gebruiker_ticket): its own QR code, and whether it was used at the entrance.
  *
- * `gebruiker_id` is the holder. The buyer (`gekocht_door`, null on rows from before ticket transfers) can put
- * the ticket on offer (`te_geven`); a friend taking it through the buyer's uitnodigingslink becomes the holder
- * (`overgedragen_op`) and gets a new code. `munten_uitgekeerd`: the included munten were credited to the holder.
+ * `gebruiker_id` is the holder, `gekocht_door` the buyer (who paid; null on rows added without it, which then
+ * count as bought by the holder). Every ticket has a `deel_code`: its own link ({link_url}/t/{deel_code}) that
+ * gives exactly this ticket to a friend. The holder can send it while the ticket is unused (kanDelen()), also when
+ * they got it from someone else. A friend claiming it becomes the holder and the ticket gets a new QR code and a
+ * new deel_code, so the old link stops working and the new holder can pass it on. Every claim is logged in
+ * `overdrachten` (from whom, to whom, when). `munten_uitgekeerd`: the included munten were credited.
  */
 class GekochtTicket extends Model
 {
@@ -25,11 +30,10 @@ class GekochtTicket extends Model
         'ticket_id',
         'gekocht_door',
         'code',
+        'deel_code',
         'gebruikt',
         'gebruikt_op',
-        'te_geven',
         'munten_uitgekeerd',
-        'overgedragen_op',
     ];
 
     protected function casts(): array
@@ -37,9 +41,7 @@ class GekochtTicket extends Model
         return [
             'gebruikt'          => 'boolean',
             'gebruikt_op'       => 'datetime',
-            'te_geven'          => 'boolean',
             'munten_uitgekeerd' => 'boolean',
-            'overgedragen_op'   => 'datetime',
         ];
     }
 
@@ -57,6 +59,42 @@ class GekochtTicket extends Model
     public function ticket(): BelongsTo
     {
         return $this->belongsTo(Ticket::class, 'ticket_id');
+    }
+
+    /** Who bought it: `gekocht_door`, or the holder on rows added without it. */
+    public function koperId(): int
+    {
+        return (int) ($this->gekocht_door ?? $this->gebruiker_id);
+    }
+
+    /** Can be given to a friend with its link: it wasn't used. */
+    public function kanDelen(): bool
+    {
+        return $this->deel_code !== null && ! $this->gebruikt;
+    }
+
+    /** Every claim of this ticket through its link, oldest first. */
+    public function overdrachten(): HasMany
+    {
+        return $this->hasMany(TicketOverdracht::class, 'gekocht_ticket_id')->orderBy('id');
+    }
+
+    /** The last claim: who the holder got it from. */
+    public function laatsteOverdracht(): HasOne
+    {
+        return $this->hasOne(TicketOverdracht::class, 'gekocht_ticket_id')->latestOfMany('id');
+    }
+
+    /** The link that gives this ticket to a friend. */
+    public function deelLink(): ?string
+    {
+        return $this->deel_code === null ? null : rtrim((string) config('lagapay.link_url'), '/') . '/t/' . $this->deel_code;
+    }
+
+    /** A new unguessable code for a ticket link (20 nanoid characters, about 120 bits, like the QR code). */
+    public static function nieuweDeelCode(): string
+    {
+        return CodeService::uniekeCode(static::class, 20, 'deel_code');
     }
 
     /** The text in the QR code: "LAGAPAY-TICKET:{code}". */

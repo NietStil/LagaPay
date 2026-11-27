@@ -9,7 +9,6 @@ use App\Models\Kaart;
 use App\Models\KaartKoppeling;
 use App\Models\Munt;
 use App\Models\Ticket;
-use App\Models\TicketUitnodiging;
 use App\Models\Transactie;
 use App\Services\Evenementen\EvenementService;
 use App\Services\Evenementen\TicketService;
@@ -618,20 +617,23 @@ class MobielApiTest extends TestCase
         $this->postJson($url, ['tickets' => [['id' => $dag->id, 'aantal' => 1]]])->assertOk()->assertJsonPath('tickets.1.aantal_gekocht', 3);
 
         // Not a deelnemer yet: no munten so far. The scan at the entrance makes me one and credits the included
-        // munten (3 × 10) in one go; opwaarderen only works from then on.
+        // munten of the scanned Dagticket only (10, not 3 × 10); opwaarderen only works from then on.
         $this->assertSame(0, DB::table('munten')->where('gebruiker_id', $ik->id)->count());
         $this->postJson($this->url("/evenementen/{$evenement->id}/opwaarderen"), ['munten' => 5, 'voor' => 'persoonlijk'])->assertNotFound();
         $this->postJson($this->url("/evenementen/{$evenement->id}/deelnemen"))->assertForbidden()->assertJsonPath('reden', 'niet_gescand');
-        $this->devScan($evenement, DB::table('gebruiker_ticket')->where('gebruiker_id', $ik->id)->value('id'))->assertOk();
+        $dagtickets = DB::table('gebruiker_ticket')->where('gebruiker_id', $ik->id)->where('ticket_id', $dag->id)->orderBy('id')->pluck('id');
+        $this->devScan($evenement, $dagtickets[0])->assertOk();
         $this->getJson($this->url("/evenementen/{$evenement->id}"))
-            ->assertJsonPath('saldo', 30)
+            ->assertJsonPath('saldo', 10)
             ->assertJsonCount(1, 'activiteit')
             ->assertJsonPath('activiteit.0.label', 'Ticket: inbegrepen munten')
-            ->assertJsonPath('activiteit.0.bedrag', 30);
+            ->assertJsonPath('activiteit.0.bedrag', 10);
 
-        // Joined: tickets bought from now on pay out right away.
+        // Joined: buying more credits nothing; each ticket pays out when it is scanned.
         $this->postJson($url, ['tickets' => [['id' => $dag->id, 'aantal' => 1]]])->assertOk();
-        $this->getJson($this->url("/evenementen/{$evenement->id}"))->assertJsonPath('saldo', 40);
+        $this->getJson($this->url("/evenementen/{$evenement->id}"))->assertJsonPath('saldo', 10);
+        $this->devScan($evenement, $dagtickets[1])->assertOk();
+        $this->getJson($this->url("/evenementen/{$evenement->id}"))->assertJsonPath('saldo', 20)->assertJsonCount(2, 'activiteit');
 
         $zonderVerkoop = $this->evenement(['heeft_tickets' => false]);
         $this->deelnemer($ik, $zonderVerkoop);
@@ -701,191 +703,235 @@ class MobielApiTest extends TestCase
         $service->voegCapaciteitToe($this->evenement(['heeft_tickets' => true])->id, $weekend->id, 5);
     }
 
-    public function test_tickets_voor_vrienden_kopen_en_accepteren(): void
+    public function test_elk_ticket_heeft_een_eigen_link_voor_een_vriend(): void
     {
         config(['lagapay.test_betalingen' => true]);
         $koper = $this->inloggen(['voornaam' => 'Lisa']);
         $evenement = $this->evenement(['heeft_tickets' => true, 'start_datum' => now()->subHour()]);
         $dag = $this->ticket($evenement, 25, 'Dagticket', 10);
         $vip = $this->ticket($evenement, 75, 'VIP', 20);
-        $url = $this->url("/evenementen/{$evenement->id}/tickets/kopen");
         $this->postJson($this->url('/evenementen/bekijk'), ['code' => $evenement->code])->assertOk();
 
-        // Can't give away more than bought.
-        $this->postJson($url, ['tickets' => [['id' => $vip->id, 'aantal' => 1, 'voor_vrienden' => 2]]])
-            ->assertUnprocessable()->assertJsonValidationErrors('tickets.0.voor_vrienden');
-
-        // 1 Dagticket for me, 2 VIP for friends.
-        $this->postJson($url, ['tickets' => [['id' => $dag->id, 'aantal' => 1], ['id' => $vip->id, 'aantal' => 2, 'voor_vrienden' => 2]]])
+        // Every ticket I buy has its own link; nothing to choose when buying.
+        $this->postJson($this->url("/evenementen/{$evenement->id}/tickets/kopen"), ['tickets' => [['id' => $dag->id, 'aantal' => 2], ['id' => $vip->id, 'aantal' => 1]]])
             ->assertOk()
             ->assertJsonPath('deelname.heeft_ticket', true);
-        $this->assertSame(2, DB::table('gebruiker_ticket')->where('te_geven', true)->count());
-        $this->assertSame($koper->id, (int) DB::table('gebruiker_ticket')->value('gekocht_door'));
+        $links = DB::table('gebruiker_ticket')->orderBy('id')->pluck('deel_code');
+        $this->assertCount(3, $links->filter()->unique());
+        $this->assertMatchesRegularExpression('/^[A-Za-z0-9_-]{20}$/', $links[0]);
+        [$dagLink, , $vipLink] = $links->all();
 
-        // The ticket on offer isn't mine to join with, and credits no munten; only my Dagticket pays out once scanned.
-        $mijnDag = DB::table('gebruiker_ticket')->where('gebruiker_id', $koper->id)->where('te_geven', false)->value('id');
-        $this->devScan($evenement, $mijnDag)->assertOk()->assertJsonPath('deelname.is_deelnemer', true);
-        $this->getJson($this->url("/evenementen/{$evenement->id}"))->assertJsonPath('saldo', 10);
+        $mijn = $this->getJson($this->url("/evenementen/{$evenement->id}/mijn-tickets"))
+            ->assertOk()
+            ->assertJsonCount(3, 'tickets')
+            ->assertJsonPath('tickets.0.deel_link', rtrim(config('lagapay.link_url'), '/') . '/t/' . $dagLink)
+            ->assertJsonPath('tickets.2.naam', 'VIP')
+            ->assertJsonPath('tickets.2.deel_link', rtrim(config('lagapay.link_url'), '/') . '/t/' . $vipLink)
+            ->assertJsonPath('weggegeven', []);
+        $oudeVipCode = $mijn->json('tickets.2.code');
 
-        $mijn = $this->getJson($this->url("/evenementen/{$evenement->id}/mijn-tickets"))->assertOk();
-        $link = $mijn->json('uitnodiging.link');
-        $code = $mijn->json('uitnodiging.code');
-        $this->assertMatchesRegularExpression('/^[A-Za-z0-9_-]{12}$/', $code);
-        $this->assertSame(rtrim(config('lagapay.link_url'), '/') . '/t/' . $code, $link);
-        $mijn->assertJsonPath('uitnodiging.beschikbaar', 2)
-            ->assertJsonPath('uitnodiging.vergeven', 0)
-            ->assertJsonPath('tickets.0.te_geven', false)
-            ->assertJsonPath('tickets.0.kan_geven', false) // credited already: I'm a deelnemer
-            ->assertJsonPath('tickets.1.te_geven', true)
-            ->assertJsonPath('tickets.1.kan_geven', true)
-            ->assertJsonPath('tickets.1.gekregen_van', null);
-        $oudeCode = $mijn->json('tickets.1.code');
-        $accepteren = fn (string $uitnodigingsCode) => $this->postJson($this->url("/ticket-uitnodigingen/{$uitnodigingsCode}/accepteren"));
+        $bekijken = fn (string $code) => $this->getJson($this->url("/ticket-uitnodigingen/{$code}"));
+        $ophalen = fn (string $code) => $this->postJson($this->url("/ticket-uitnodigingen/{$code}/accepteren"));
 
-        // The link itself: nothing for the buyer, unknown code is a 404.
-        $accepteren($code)->assertOk()->assertJsonPath('resultaat', 'eigen_link');
-        $accepteren('onbekend')->assertNotFound();
+        // My own link: nothing to claim. Unknown links are a 404.
+        $bekijken($vipLink)->assertOk()->assertJsonPath('status', 'eigen_link');
+        $ophalen($vipLink)->assertOk()->assertJsonPath('resultaat', 'eigen_link');
+        $bekijken('onbekend')->assertNotFound()->assertExactJson(['message' => 'Deze link werkt niet (meer).']);
+        $ophalen('onbekend')->assertNotFound();
 
-        // Friend 1 opens the link: gets a VIP; joins (and gets its 20 munten) once it is scanned.
+        // Noor opens the VIP link: sees exactly which ticket it is before claiming it.
         $noor = Gebruiker::factory()->create(['voornaam' => 'Noor']);
         Sanctum::actingAs($noor);
-        $accepteren($code)
+        $bekijken($vipLink)
+            ->assertOk()
+            ->assertJsonPath('status', 'beschikbaar')
+            ->assertJsonPath('ticket', ['naam' => 'VIP', 'munten' => 20])
+            ->assertJsonPath('van', 'Lisa')
+            ->assertJsonPath('opgehaald_door', null)
+            ->assertJsonPath('evenement.id', $evenement->id);
+        $this->assertSame($koper->id, (int) DB::table('gebruiker_ticket')->where('deel_code', $vipLink)->value('gebruiker_id'));
+
+        $ophalen($vipLink)
             ->assertOk()
             ->assertJsonPath('resultaat', 'gekregen')
             ->assertJsonPath('van', 'Lisa')
-            ->assertJsonPath('evenement.id', $evenement->id)
             ->assertJsonPath('deelname', ['is_deelnemer' => false, 'heeft_ticket' => true, 'ticket_gescand' => false, 'gestart' => true, 'kan_deelnemen' => false]);
-        $this->devScan($evenement, DB::table('gebruiker_ticket')->where('gebruiker_id', $noor->id)->value('id'))->assertOk();
-        $this->getJson($this->url("/evenementen/{$evenement->id}"))->assertJsonPath('saldo', 20);
-        $this->getJson($this->url("/evenementen/{$evenement->id}/mijn-tickets"))
+        // Mine now, with a new QR code (the one Lisa saw stops working) and a new link I can pass it on with.
+        $noorsVip = $this->getJson($this->url("/evenementen/{$evenement->id}/mijn-tickets"))
             ->assertJsonCount(1, 'tickets')
             ->assertJsonPath('tickets.0.naam', 'VIP')
             ->assertJsonPath('tickets.0.gekregen_van', 'Lisa')
-            ->assertJsonPath('tickets.0.gebruikt', true)
-            ->assertJsonPath('tickets.0.kan_geven', false)
-            ->assertJsonPath('uitnodiging', null);
-        $this->assertNotSame($oudeCode, $this->getJson($this->url("/evenementen/{$evenement->id}/mijn-tickets"))->json('tickets.0.code'));
+            ->json('tickets.0');
+        $this->assertNotSame($oudeVipCode, $noorsVip['code']);
+        $this->assertNotNull($noorsVip['deel_link']);
+        $this->assertStringEndsNotWith('/t/' . $vipLink, $noorsVip['deel_link']);
+        $this->assertSame(0, DB::table('gebruiker_ticket')->where('code', $oudeVipCode)->orWhere('deel_code', $vipLink)->count());
 
-        // Opening it again doesn't take a second ticket. A friend with their own ticket doesn't either.
-        $accepteren($code)->assertOk()->assertJsonPath('resultaat', 'al_ontvangen');
+        // The old link stops working; one ticket per friend, so another link of Lisa's doesn't give Noor a second one.
+        $bekijken($vipLink)->assertNotFound();
+        $ophalen($vipLink)->assertNotFound();
+        $bekijken($dagLink)->assertJsonPath('status', 'al_ticket');
+        $ophalen($dagLink)->assertOk()->assertJsonPath('resultaat', 'al_ticket');
         $this->assertSame(1, DB::table('gebruiker_ticket')->where('gebruiker_id', $noor->id)->count());
 
+        // A friend with a ticket of their own doesn't get one either.
         $tim = Gebruiker::factory()->create(['voornaam' => 'Tim']);
         Sanctum::actingAs($tim);
         $this->koop($tim, $dag);
-        $accepteren($code)->assertOk()->assertJsonPath('resultaat', 'al_ticket');
-        $this->assertSame(1, DB::table('gebruiker_ticket')->where('gebruiker_id', $tim->id)->count());
+        $ophalen($dagLink)->assertOk()->assertJsonPath('resultaat', 'al_ticket');
 
-        // Friend 2 takes the last one; friend 3 is too late.
         $eva = Gebruiker::factory()->create(['voornaam' => 'Eva']);
         Sanctum::actingAs($eva);
-        $accepteren($code)->assertOk()->assertJsonPath('resultaat', 'gekregen');
-        $jan = Gebruiker::factory()->create(['voornaam' => 'Jan']);
-        Sanctum::actingAs($jan);
-        $accepteren($code)
-            ->assertStatus(409)
-            ->assertExactJson(['message' => 'Alle tickets van Lisa zijn al vergeven.', 'reden' => 'vol', 'evenement_id' => $evenement->id]);
-        $this->assertDatabaseMissing('gebruiker_evenement', ['gebruiker_id' => $jan->id, 'evenement_id' => $evenement->id]);
+        $this->travel(1)->minutes();
+        $ophalen($dagLink)->assertOk()->assertJsonPath('resultaat', 'gekregen');
 
-        // The buyer sees who took one; the old QR codes no longer scan as the buyer's.
+        // Noor passes the VIP on to Bram with her link: Bram sees it comes from Noor.
+        $noorsLink = substr($noorsVip['deel_link'], strrpos($noorsVip['deel_link'], '/') + 1);
+        $bram = Gebruiker::factory()->create(['voornaam' => 'Bram']);
+        Sanctum::actingAs($bram);
+        $bekijken($noorsLink)->assertOk()->assertJsonPath('status', 'beschikbaar')->assertJsonPath('van', 'Noor');
+        $this->travel(1)->minutes();
+        $ophalen($noorsLink)->assertOk()->assertJsonPath('resultaat', 'gekregen')->assertJsonPath('van', 'Noor');
+        $this->getJson($this->url("/evenementen/{$evenement->id}/mijn-tickets"))
+            ->assertJsonPath('tickets.0.naam', 'VIP')
+            ->assertJsonPath('tickets.0.gekregen_van', 'Noor');
+        // Lisa still paid for it.
+        $this->assertSame($koper->id, (int) DB::table('gebruiker_ticket')->where('gebruiker_id', $bram->id)->value('gekocht_door'));
+
+        // Bram joins, and gets the VIP's 20 munten, once it is scanned.
+        $this->devScan($evenement, DB::table('gebruiker_ticket')->where('gebruiker_id', $bram->id)->value('id'))->assertOk();
+        $this->getJson($this->url("/evenementen/{$evenement->id}"))->assertJsonPath('saldo', 20);
+
+        // Everyone sees which ticket they gave to whom.
+        Sanctum::actingAs($noor);
+        $this->getJson($this->url("/evenementen/{$evenement->id}/mijn-tickets"))
+            ->assertJsonCount(0, 'tickets')
+            ->assertJsonCount(1, 'weggegeven')
+            ->assertJsonPath('weggegeven.0.naam', 'VIP')
+            ->assertJsonPath('weggegeven.0.aan', 'Bram');
         Sanctum::actingAs($koper);
         $this->getJson($this->url("/evenementen/{$evenement->id}/mijn-tickets"))
             ->assertJsonCount(1, 'tickets')
-            ->assertJsonPath('uitnodiging.beschikbaar', 0)
-            ->assertJsonPath('uitnodiging.vergeven', 2)
-            ->assertJsonPath('uitnodiging.genomen.0.naam', 'Noor')
-            ->assertJsonPath('uitnodiging.genomen.1.naam', 'Eva');
-        $this->assertSame(0, DB::table('gebruiker_ticket')->where('code', $oudeCode)->count());
+            ->assertJsonPath('deelname.heeft_ticket', true)
+            ->assertJsonCount(2, 'weggegeven')
+            ->assertJsonPath('weggegeven.0.naam', 'VIP')
+            ->assertJsonPath('weggegeven.0.aan', 'Noor')
+            ->assertJsonPath('weggegeven.1.naam', 'Dagticket')
+            ->assertJsonPath('weggegeven.1.aan', 'Eva');
     }
 
-    public function test_ticket_voor_vriend_voor_de_start_en_regels(): void
+    public function test_ticket_link_gebruikt_oude_tickets_en_scan(): void
     {
         config(['lagapay.test_betalingen' => true]);
         $koper = $this->inloggen(['voornaam' => 'Lisa']);
         $evenement = $this->evenement(['heeft_tickets' => true, 'start_datum' => now()->addDay()]);
         $dag = $this->ticket($evenement, 25, 'Dagticket', 10);
         $this->postJson($this->url('/evenementen/bekijk'), ['code' => $evenement->code])->assertOk();
-        $this->postJson($this->url("/evenementen/{$evenement->id}/tickets/kopen"), ['tickets' => [['id' => $dag->id, 'aantal' => 3]]])->assertOk();
+        $this->postJson($this->url("/evenementen/{$evenement->id}/tickets/kopen"), ['tickets' => [['id' => $dag->id, 'aantal' => 2]]])->assertOk();
         $tickets = DB::table('gebruiker_ticket')->where('gebruiker_id', $koper->id)->orderBy('id')->pluck('id');
-        $geven = fn (int $ticketId, bool $teGeven) => $this->putJson($this->url("/evenementen/{$evenement->id}/mijn-tickets/{$ticketId}"), ['te_geven' => $teGeven]);
+        $link = fn (int $ticketId) => DB::table('gebruiker_ticket')->where('id', $ticketId)->value('deel_code');
+        $ophalen = fn (string $code) => $this->postJson($this->url("/ticket-uitnodigingen/{$code}/accepteren"));
 
-        // Marking tickets on offer after buying (nothing credited yet, I'm not a deelnemer).
-        $this->getJson($this->url("/evenementen/{$evenement->id}/mijn-tickets"))->assertJsonPath('tickets.0.kan_geven', true);
-        $geven($tickets[0], true)->assertOk()->assertJsonPath('uitnodiging.beschikbaar', 1)->assertJsonPath('tickets.2.te_geven', true);
-        $geven($tickets[1], true)->assertOk()->assertJsonPath('uitnodiging.beschikbaar', 2);
-        $geven($tickets[1], false)->assertOk()->assertJsonPath('uitnodiging.beschikbaar', 1);
-        $geven($tickets[0], true)->assertOk(); // already on offer: nothing changes
-        $geven(999999, true)->assertNotFound();
-        $this->putJson($this->url("/evenementen/{$evenement->id}/mijn-tickets/{$tickets[0]}"), [])->assertUnprocessable();
+        // A ticket I use myself: no link anymore on my screen, and the link says it was used.
+        $this->devScan($evenement, $tickets[1])->assertOk()->assertJsonPath('tickets.1.deel_link', null);
+        $this->getJson($this->url("/evenementen/{$evenement->id}"))->assertJsonPath('saldo', 10);
+        Sanctum::actingAs(Gebruiker::factory()->create());
+        $this->getJson($this->url("/ticket-uitnodigingen/{$link($tickets[1])}"))->assertOk()->assertJsonPath('status', 'gebruikt');
+        $ophalen($link($tickets[1]))->assertStatus(409)->assertJsonPath('reden', 'gebruikt');
 
-        // A friend takes it: holds the ticket, not a deelnemer before the scan, no munten.
-        $code = $this->getJson($this->url("/evenementen/{$evenement->id}/mijn-tickets"))->json('uitnodiging.code');
+        // A friend claims the other one: holds the ticket, not a deelnemer before the scan (even before the start), no munten.
         $noor = Gebruiker::factory()->create();
         Sanctum::actingAs($noor);
-        $this->postJson($this->url("/ticket-uitnodigingen/{$code}/accepteren"))
+        $ophalen($link($tickets[0]))
             ->assertOk()
             ->assertJsonPath('resultaat', 'gekregen')
             ->assertJsonPath('deelname', ['is_deelnemer' => false, 'heeft_ticket' => true, 'ticket_gescand' => false, 'gestart' => false, 'kan_deelnemen' => false]);
         $this->postJson($this->url("/evenementen/{$evenement->id}/deelnemen"))->assertForbidden()->assertJsonPath('reden', 'niet_gescand');
-
-        // A ticket I got isn't mine to pass on.
-        $gekregen = DB::table('gebruiker_ticket')->where('gebruiker_id', $noor->id)->value('id');
-        $this->putJson($this->url("/evenementen/{$evenement->id}/mijn-tickets/{$gekregen}"), ['te_geven' => true])
-            ->assertForbidden()
-            ->assertExactJson(['message' => 'Dit ticket heb je gekregen, je kunt het niet doorgeven.']);
-
-        // Scanned at the entrance (even before the start): the friend joins and gets the munten.
-        $this->devScan($evenement, $gekregen)->assertOk()->assertJsonPath('deelname.is_deelnemer', true);
+        $this->devScan($evenement, $tickets[0])->assertOk()->assertJsonPath('deelname.is_deelnemer', true);
         $this->getJson($this->url("/evenementen/{$evenement->id}"))->assertJsonPath('saldo', 10);
 
-        // Me: after joining, the munten of my tickets are credited and those tickets can't be given away anymore;
-        // a ticket still on offer can be taken back (and then pays out).
+        // Tickets added without a buyer or link (seeders) get a link when their holder opens Mijn tickets; claiming one
+        // records the holder as the buyer.
         Sanctum::actingAs($koper);
-        $this->devScan($evenement, $tickets[2])->assertOk();
-        $this->getJson($this->url("/evenementen/{$evenement->id}"))->assertJsonPath('saldo', 20); // tickets[1] and [2]
-        $geven($tickets[1], true)
-            ->assertStatus(409)
-            ->assertExactJson(['message' => 'De munten van dit ticket staan al op je saldo, dit ticket kun je niet meer weggeven.']);
-        $geven($tickets[2], true)->assertStatus(409);
-
-        // Bought for a friend after joining: nothing credited; taking it back pays out.
-        $this->postJson($this->url("/evenementen/{$evenement->id}/tickets/kopen"), ['tickets' => [['id' => $dag->id, 'aantal' => 1, 'voor_vrienden' => 1]]])->assertOk();
-        $this->getJson($this->url("/evenementen/{$evenement->id}"))->assertJsonPath('saldo', 20);
-        $nieuw = DB::table('gebruiker_ticket')->where('gebruiker_id', $koper->id)->where('te_geven', true)->value('id');
-        $geven($nieuw, false)->assertOk()->assertJsonPath('uitnodiging.beschikbaar', 0);
-        $this->getJson($this->url("/evenementen/{$evenement->id}"))->assertJsonPath('saldo', 30);
-
-        // Used tickets can't be given away.
-        DB::table('gebruiker_ticket')->where('id', $tickets[2])->update(['gebruikt' => true]);
-        $geven($tickets[2], false)->assertStatus(409)->assertJsonPath('message', 'Dit ticket is al gebruikt.');
+        $this->koop($koper, $dag);
+        $oud = (int) DB::table('gebruiker_ticket')->where('gebruiker_id', $koper->id)->whereNull('deel_code')->value('id');
+        $this->getJson($this->url("/evenementen/{$evenement->id}/mijn-tickets"))->assertJsonPath('tickets.1.deel_link', fn ($deelLink) => $deelLink !== null);
+        // Its munten were already paid out to me (tickets from before munten were paid per scan): the friend doesn't get them.
+        DB::table('gebruiker_ticket')->where('id', $oud)->update(['munten_uitgekeerd' => true]);
+        $eva = Gebruiker::factory()->create();
+        Sanctum::actingAs($eva);
+        $this->getJson($this->url("/ticket-uitnodigingen/{$link($oud)}"))->assertJsonPath('ticket.munten', null);
+        $ophalen($link($oud))->assertOk()->assertJsonPath('resultaat', 'gekregen');
+        $this->assertSame($koper->id, (int) DB::table('gebruiker_ticket')->where('id', $oud)->value('gekocht_door'));
+        $this->devScan($evenement, $oud)->assertOk();
+        $this->getJson($this->url("/evenementen/{$evenement->id}"))->assertJsonPath('saldo', 0);
     }
 
-    public function test_uitnodiging_gesloten_geblokkeerd_en_zonder_aanbod(): void
+    public function test_ticket_link_gesloten_en_geblokkeerd(): void
     {
         config(['lagapay.test_betalingen' => true]);
         $koper = $this->inloggen(['voornaam' => 'Lisa']);
         $evenement = $this->evenement(['heeft_tickets' => true, 'start_datum' => now()->subHour()]);
         $dag = $this->ticket($evenement, 25, 'Dagticket', 10);
         $this->postJson($this->url('/evenementen/bekijk'), ['code' => $evenement->code])->assertOk();
-        $this->postJson($this->url("/evenementen/{$evenement->id}/tickets/kopen"), ['tickets' => [['id' => $dag->id, 'aantal' => 2, 'voor_vrienden' => 2]]])->assertOk();
-        $code = $this->getJson($this->url("/evenementen/{$evenement->id}/mijn-tickets"))->json('uitnodiging.code');
-
-        // A buyer who put all tickets on offer has none of their own, so they can't join with those.
-        $this->postJson($this->url("/evenementen/{$evenement->id}/deelnemen"))->assertForbidden()->assertJsonPath('reden', 'ticket_nodig');
-        $this->postJson($this->url('/evenementen/join'), ['code' => $evenement->code])->assertForbidden()->assertJsonPath('reden', 'ticket_nodig');
+        $this->postJson($this->url("/evenementen/{$evenement->id}/tickets/kopen"), ['tickets' => [['id' => $dag->id, 'aantal' => 2]]])->assertOk();
+        $code = DB::table('gebruiker_ticket')->orderBy('id')->value('deel_code');
 
         // Blocked friends don't get one.
         $geblokkeerd = Gebruiker::factory()->create();
         $this->deelnemer($geblokkeerd, $evenement, geblokkeerd: true);
         Sanctum::actingAs($geblokkeerd);
+        $this->getJson($this->url("/ticket-uitnodigingen/{$code}"))->assertOk()->assertJsonPath('status', 'geblokkeerd');
         $this->postJson($this->url("/ticket-uitnodigingen/{$code}/accepteren"))->assertForbidden()->assertJsonPath('reden', 'geblokkeerd');
-        $this->assertSame(2, DB::table('gebruiker_ticket')->where('gebruiker_id', $koper->id)->where('te_geven', true)->count());
+        $this->assertSame(2, DB::table('gebruiker_ticket')->where('gebruiker_id', $koper->id)->count());
 
-        // Gesloten evenement: no more tickets move.
+        // Gesloten evenement: no more tickets move, and Mijn tickets shows no links.
         $evenement->update(['open' => false]);
         Sanctum::actingAs(Gebruiker::factory()->create());
+        $this->getJson($this->url("/ticket-uitnodigingen/{$code}"))->assertOk()->assertJsonPath('status', 'gesloten');
         $this->postJson($this->url("/ticket-uitnodigingen/{$code}/accepteren"))->assertForbidden()->assertJsonPath('reden', 'gesloten');
         $this->assertSame(2, DB::table('gebruiker_ticket')->where('gebruiker_id', $koper->id)->count());
+        Sanctum::actingAs($koper);
+        $this->getJson($this->url("/evenementen/{$evenement->id}/mijn-tickets"))
+            ->assertJsonPath('tickets.0.deel_link', null)
+            ->assertJsonPath('tickets.1.deel_link', null);
+    }
+
+    public function test_ticket_links_na_drie_mislukte_pogingen_even_geblokkeerd(): void
+    {
+        config(['lagapay.test_betalingen' => true]);
+        $koper = $this->inloggen();
+        $evenement = $this->evenement(['heeft_tickets' => true, 'start_datum' => now()->subHour()]);
+        $dag = $this->ticket($evenement, 25, 'Dagticket');
+        $this->postJson($this->url('/evenementen/bekijk'), ['code' => $evenement->code])->assertOk();
+        $this->postJson($this->url("/evenementen/{$evenement->id}/tickets/kopen"), ['tickets' => [['id' => $dag->id, 'aantal' => 1]]])->assertOk();
+        $code = DB::table('gebruiker_ticket')->value('deel_code');
+
+        // "Nothing changed" answers aren't failures.
+        $this->postJson($this->url("/ticket-uitnodigingen/{$code}/accepteren"))->assertOk()->assertJsonPath('resultaat', 'eigen_link');
+
+        // Three failed attempts, on the preview or the claim: then both answer 429, also for a valid link.
+        $raden = Gebruiker::factory()->create();
+        Sanctum::actingAs($raden);
+        $this->getJson($this->url('/ticket-uitnodigingen/gok1'))->assertNotFound();
+        $this->postJson($this->url('/ticket-uitnodigingen/gok2/accepteren'))->assertNotFound();
+        $this->postJson($this->url('/ticket-uitnodigingen/gok3/accepteren'))->assertNotFound();
+        $this->postJson($this->url("/ticket-uitnodigingen/{$code}/accepteren"))
+            ->assertStatus(429)
+            ->assertHeader('Retry-After')
+            ->assertExactJson(['message' => 'Te veel mislukte pogingen. Probeer het over 10 minuten opnieuw.']);
+        $this->getJson($this->url("/ticket-uitnodigingen/{$code}"))->assertStatus(429);
+        $this->assertSame($koper->id, (int) DB::table('gebruiker_ticket')->value('gebruiker_id'));
+
+        // Per gebruiker: someone else can still claim it.
+        Sanctum::actingAs(Gebruiker::factory()->create());
+        $this->postJson($this->url("/ticket-uitnodigingen/{$code}/accepteren"))->assertOk()->assertJsonPath('resultaat', 'gekregen');
+
+        // After 10 minutes it works again.
+        Sanctum::actingAs($raden);
+        $this->travel(10)->minutes();
+        $this->travel(1)->seconds();
+        $this->getJson($this->url('/ticket-uitnodigingen/gok4'))->assertNotFound();
     }
 
     public function test_mijn_tickets_met_qr_en_scannen(): void
@@ -938,9 +984,10 @@ class MobielApiTest extends TestCase
             ->assertJsonPath('ticket.eigenaar', $ik->name)
             ->assertJsonPath('ticket.gebruikt', true);
         $this->assertDatabaseHas('gebruiker_ticket', ['id' => $eerste['id'], 'gebruikt' => true]);
-        // The scan makes the holder a deelnemer (also before the start) and credits the munten of their tickets.
+        // The scan makes the holder a deelnemer (also before the start) and credits the munten of the scanned
+        // ticket only, not of the other Dagticket.
         $this->assertDatabaseHas('gebruiker_evenement', ['gebruiker_id' => $ik->id, 'evenement_id' => $evenement->id, 'geblokkeerd' => false]);
-        $this->assertSame(20, (int) DB::table('munten')->where('gebruiker_id', $ik->id)->where('evenement_id', $evenement->id)->sum('hoeveelheid'));
+        $this->assertSame(10, (int) DB::table('munten')->where('gebruiker_id', $ik->id)->where('evenement_id', $evenement->id)->sum('hoeveelheid'));
 
         // Scanning it again: already used. A typed code (without the prefix) works too.
         $this->postJson($this->url('/tickets/scan'), ['code' => $eerste['code']])
@@ -950,6 +997,8 @@ class MobielApiTest extends TestCase
 
         Sanctum::actingAs(Gebruiker::factory()->create(['rol' => 'admin']));
         $this->postJson($this->url('/tickets/scan'), ['code' => $response->json('tickets.1.code')])->assertOk();
+        // The second Dagticket pays out to its holder when it is scanned.
+        $this->assertSame(20, (int) DB::table('munten')->where('gebruiker_id', $ik->id)->where('evenement_id', $evenement->id)->sum('hoeveelheid'));
 
         // In the app: used tickets say so, and the Tickets tab counts them.
         Sanctum::actingAs($ik);
@@ -1058,13 +1107,11 @@ class MobielApiTest extends TestCase
 
         $ik->evenementen()->attach($evenement->id, ['betaalbron' => $groep->id]);
         KaartKoppeling::create(['kaart_id' => $permanent->id, 'gebruiker_id' => $ik->id, 'evenement_id' => $evenement->id]);
-        TicketUitnodiging::voor($ik->id, $evenement->id);
 
         app(EvenementService::class)->deleteEvenement($evenement->id);
 
         $this->assertDatabaseMissing('evenementen', ['id' => $evenement->id]);
         $this->assertDatabaseCount('kaart_koppelingen', 0);
-        $this->assertDatabaseCount('ticket_uitnodigingen', 0);
         $this->assertDatabaseHas('kaarten', ['id' => $permanent->id]);
     }
 
@@ -1114,7 +1161,6 @@ class MobielApiTest extends TestCase
                 'status'          => 'geldig',
                 'aantal'          => 3,
                 'aantal_gebruikt' => 1,
-                'aantal_te_geven' => 0,
                 'soorten'         => [['naam' => 'Dagticket', 'aantal' => 1], ['naam' => 'Weekend', 'aantal' => 2]],
                 'munten'          => 10,
             ])

@@ -198,8 +198,8 @@ class WebTicketsTest extends TestCase
         $kopen = $this->url('/e/WEB-KOPEN-00001/tickets');
 
         // Same validation as the app (TicketsKopenRequest).
-        $this->post($kopen, ['tickets' => [['id' => $dag->id, 'aantal' => 1, 'voor_vrienden' => 2]]])
-            ->assertSessionHasErrors('tickets.0.voor_vrienden');
+        $this->post($kopen, ['tickets' => [['id' => $dag->id, 'aantal' => 11]]])
+            ->assertSessionHasErrors('tickets.0.aantal');
         // Same capaciteit check (BetaalService): only 1 VIP left.
         $this->post($kopen, ['tickets' => [['id' => $vip->id, 'aantal' => 2]]])
             ->assertSessionHasErrors(['tickets' => 'Er zijn nog maar 1 tickets van VIP beschikbaar.']);
@@ -207,20 +207,21 @@ class WebTicketsTest extends TestCase
 
         // Bought: on to my tickets (a separate page), with how many I just bought.
         $this->followingRedirects()
-            ->post($kopen, ['tickets' => [['id' => $dag->id, 'aantal' => 2, 'voor_vrienden' => 1], ['id' => $vip->id, 'aantal' => 1]]])
+            ->post($kopen, ['tickets' => [['id' => $dag->id, 'aantal' => 2], ['id' => $vip->id, 'aantal' => 1]]])
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Web/EvenementMijnTickets')
                 ->where('gekocht', 3)
-                // My tickets with QR codes and the friends link, like in the app.
+                // My tickets with QR codes, each with its own link for a friend, like in the app.
                 ->has('tickets', 3)
-                ->where('tickets.0.qr', fn ($qr) => str_ends_with($qr, DB::table('gebruiker_ticket')->where('gebruiker_id', $ik->id)->where('te_geven', false)->orderBy('id')->value('code')))
-                ->where('uitnodiging.beschikbaar', 1)
+                ->where('tickets.0.qr', fn ($qr) => str_ends_with($qr, DB::table('gebruiker_ticket')->where('gebruiker_id', $ik->id)->orderBy('id')->value('code')))
+                ->where('tickets.0.deel_link', fn ($link) => str_ends_with($link, '/t/' . DB::table('gebruiker_ticket')->where('gebruiker_id', $ik->id)->orderBy('id')->value('deel_code')))
+                ->where('weggegeven', [])
                 ->where('deelname.heeft_ticket', true)
                 ->where('ticketsUrl', route('web.tickets', 'WEB-KOPEN-00001')));
 
         $this->assertSame(3, DB::table('gebruiker_ticket')->where('gebruiker_id', $ik->id)->count());
-        $this->assertSame(1, DB::table('gebruiker_ticket')->where('gebruiker_id', $ik->id)->where('te_geven', true)->count());
+        $this->assertSame(3, DB::table('gebruiker_ticket')->where('gebruiker_id', $ik->id)->whereNotNull('deel_code')->count());
 
         // The "just bought" message is only shown once.
         $this->get($this->url('/e/WEB-KOPEN-00001/mijn-tickets'))->assertInertia(fn (Assert $page) => $page->where('gekocht', null));

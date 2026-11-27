@@ -1,5 +1,5 @@
 // A shareable uitnodigingslink as a row: link, QR-code button (full-screen QR) and Delen. Used for the groep
-// invite link and for the link that hands tickets to friends.
+// invite link and for the link of a ticket on offer for a friend (one per ticket).
 
 import { useState } from 'react';
 import { Platform, Pressable, Share, Text, View } from 'react-native';

@@ -71,7 +71,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/deelnemen', [EvenementController::class, 'deelnemen'])->name('evenementen.deelnemen');
         Route::post('/tickets/kopen', [BetaalController::class, 'ticketsKopen'])->name('evenementen.tickets.kopen');
         Route::get('/mijn-tickets', [TicketController::class, 'mijnTickets'])->name('evenementen.mijn-tickets');
-        Route::put('/mijn-tickets/{ticket}', [TicketController::class, 'teGeven'])->whereNumber('ticket')->name('evenementen.mijn-tickets.te-geven');
         // Development only (config lagapay.dev_scan), otherwise 404.
         Route::post('/mijn-tickets/{ticket}/dev-scan', [TicketController::class, 'devScan'])->whereNumber('ticket')->name('evenementen.mijn-tickets.dev-scan');
     });
@@ -96,6 +95,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/tickets', [TicketController::class, 'index'])->name('tickets.index');
     Route::post('/tickets/scan', [TicketController::class, 'scan'])->name('tickets.scan');
+    Route::get('/ticket-uitnodigingen/{code}', [TicketController::class, 'uitnodiging'])->name('ticket-uitnodigingen.show');
     Route::post('/ticket-uitnodigingen/{code}/accepteren', [TicketController::class, 'accepteer'])->name('ticket-uitnodigingen.accepteren');
 
     Route::put('/profiel', [ProfielController::class, 'update'])->name('profiel.update');
